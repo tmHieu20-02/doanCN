@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import axios, { AxiosError } from "axios";
 import { jwtDecode } from "jwt-decode";
+import { router } from "expo-router"; // ← THÊM
 
 // Cấu hình chung
 const BASE_URL = "https://phatdat.store/api/v1/auth";
@@ -25,9 +26,14 @@ interface AuthResponse {
 interface AuthContextData {
   user: UserSession | null;
   isInitialized: boolean;
-  isLoading: boolean; // ← BẮT BUỘC CÓ
+  isLoading: boolean;
   signIn: (params: { numberPhone: string; password: string }) => Promise<AuthResponse>;
-  signUp: (params: { full_name: string; email: string; numberPhone: string; password: string }) => Promise<{ success: boolean; message: string }>;
+  signUp: (params: {
+    full_name: string;
+    email: string;
+    numberPhone: string;
+    password: string;
+  }) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -36,7 +42,7 @@ const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserSession | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // ← ADD STATE
+  const [isLoading, setIsLoading] = useState(false);
 
   // Load user từ SecureStore
   useEffect(() => {
@@ -57,9 +63,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadUser();
   }, []);
 
-  // LOGIN (ĐÃ FIX)
-  const signIn = async ({ numberPhone, password }: { numberPhone: string; password: string }): Promise<AuthResponse> => {
-    setIsLoading(true); // ← bật loading
+  // LOGIN
+  const signIn = async ({
+    numberPhone,
+    password,
+  }: {
+    numberPhone: string;
+    password: string;
+  }): Promise<AuthResponse> => {
+    setIsLoading(true);
 
     try {
       console.log(`>>> [AUTH] Đang login: ${BASE_URL}/login`);
@@ -84,20 +96,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, message: "Token không chứa đủ thông tin người dùng." };
       }
 
-      // Tạo session từ token
+      // Chuẩn hóa roleId về number
+      const roleIdNumber = Number(decoded.roleId);
+
+      // Tạo session từ token (GIỮ LOGIC CŨ, CHỈ CHỈNH roleId)
       const session: UserSession = {
         token,
         id: decoded.id,
         numberPhone: decoded.numberPhone,
-        roleId: decoded.roleId,
+        roleId: roleIdNumber,
       };
 
       // Lưu lại
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(session));
       setUser(session);
 
-      return { success: true, data: session };
+    // Điều hướng theo role
+if (roleIdNumber === 2) {
+  router.replace("/staff" as never);   // staff vào đây
+} else if (roleIdNumber === 3) {
+  router.replace("/(tabs)" as never);  // user
+}
+ else if (roleIdNumber === 1) {
+  console.log(">>> [AUTH] Admin login - dùng web, không điều hướng trong app");
+}
 
+
+      return { success: true, data: session };
     } catch (err) {
       const error = err as AxiosError;
       const msg =
@@ -107,14 +132,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log(">>> [AUTH] Lỗi login:", msg);
       return { success: false, message: msg };
-
     } finally {
-      setIsLoading(false); // ← tắt loading
+      setIsLoading(false);
     }
   };
 
-  // REGISTER
-  const signUp = async (data: { full_name: string; email: string; numberPhone: string; password: string }) => {
+  // REGISTER – giữ nguyên
+  const signUp = async (data: {
+    full_name: string;
+    email: string;
+    numberPhone: string;
+    password: string;
+  }) => {
     setIsLoading(true);
 
     try {
@@ -123,20 +152,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return {
         success: ok,
-        message: res.data?.mes || res.data?.message || (ok ? "Đăng ký thành công" : "Đăng ký thất bại"),
+        message:
+          res.data?.mes ||
+          res.data?.message ||
+          (ok ? "Đăng ký thành công" : "Đăng ký thất bại"),
       };
-
     } catch (err) {
       const error = err as AxiosError;
       const msg = (error.response?.data as any)?.mes || "Lỗi kết nối server.";
       return { success: false, message: msg };
-
     } finally {
       setIsLoading(false);
     }
   };
 
-  // LOGOUT
+  // LOGOUT – giữ nguyên
   const signOut = async () => {
     await SecureStore.deleteItemAsync(USER_KEY);
     setUser(null);
@@ -147,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         isInitialized,
-        isLoading,     // ← BẮT BUỘC TRUYỀN VÀO
+        isLoading,
         signIn,
         signUp,
         signOut,
