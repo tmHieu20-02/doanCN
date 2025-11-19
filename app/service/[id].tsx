@@ -465,13 +465,15 @@ export default function ServiceDetailScreen() {
           {/**************************************/}
           <TouchableOpacity
             style={styles.bookButtonContent}
-            onPress={() =>
-              router.push({
-                pathname: '/booking/new',
-                // Đổi 'id' thành 'serviceId' cho đồng nhất
-                params: { serviceId: id?.toString() },
-              })
-            }
+          onPress={() =>
+ router.push({
+  pathname: "/booking",
+  params: { serviceId: id?.toString() },
+})
+
+}
+
+
           >
             <Calendar size={20} color="#FFFFFF" />
             <Text style={styles.bookButtonText}>Đặt lịch ngay</Text>
