@@ -27,6 +27,8 @@ export function useServices() {
         const session = await SecureStore.getItemAsync("my-user-session");
         const token = session ? JSON.parse(session).token : null;
 
+        console.log(">>> TOKEN USER:", token);   // THÊM DÒNG NÀY
+
         if (!token) throw new Error("Missing access token");
 
         const res = await api.get("/api/v1/service/get-all", {

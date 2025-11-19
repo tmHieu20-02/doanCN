@@ -13,37 +13,103 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Search, MapPin, Star, Clock, Filter } from 'lucide-react-native';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store'; // <--- 1. NHỚ IMPORT CÁI NÀY
+import * as SecureStore from 'expo-secure-store';
 
 // Hooks
 import { useCategories, Category } from '../../hooks/useCategories';
-import { useServices, Service } from '../../hooks/useServices';
 
 // Theme
 import { colors } from '@/ui/theme';
 
+export type Service = {
+  id: number;
+  name: string;
+  description?: string;
+  image?: string;
+  price: number;
+  duration?: string;
+  categoryId: number;
+  rating?: number;
+  reviewCount?: number;
+};
+
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // 2. SỬA Ở ĐÂY: Thay vì fix cứng tên, ta dùng State để hứng dữ liệu thật
   const [user, setUser] = useState<any>(null);
 
-  const { categories, isLoading: categoriesLoading, error: categoriesError } = useCategories();
-  const { services, isLoading: servicesLoading, error: servicesError } = useServices();
+  const { categories, isLoading: categoriesLoading, error: categoriesError } =
+    useCategories();
 
-  // 3. THÊM ĐOẠN NÀY: Tự động lấy thông tin User khi vào màn hình
+  /* ---------------------------------------------------------
+        FINAL: LẤY DỊCH VỤ QUA API BOOKING (User không có quyền service)
+  ----------------------------------------------------------*/
+  const [services, setServices] = useState<Service[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [servicesError, setServicesError] = useState('');
+
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        setServicesLoading(true);
+
+        const session = await SecureStore.getItemAsync('my-user-session');
+        const token = session ? JSON.parse(session).token : null;
+
+        console.log('>>> TOKEN USER:', token);
+
+        const res = await fetch('https://phatdat.store/api/v1/booking/get-all', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: '*/*',
+          },
+        });
+
+        const json = await res.json();
+        console.log('>>> BOOKING RAW:', json);
+
+        if (!json.data) {
+          setServicesError('Không thể tải dịch vụ.');
+          return;
+        }
+
+        // Convert Booking → Service để UI hoạt động
+        const mapped = json.data.map((b: any) => ({
+          id: b.service_id || b.id,
+          name: b.serviceName || 'Dịch vụ',
+          description: b.note || '',
+          image: b.image || 'https://picsum.photos/300',
+          price: b.price || 0,
+          duration: b.duration || '30 phút',
+          categoryId: 1,
+          rating: 4.5,
+          reviewCount: 10,
+        }));
+
+        setServices(mapped);
+      } catch (e: any) {
+        setServicesError('Không thể tải dịch vụ.');
+      } finally {
+        setServicesLoading(false);
+      }
+    };
+
+    fetchServices();
+  }, []);
+
+  /* ------------------------------------------------------- */
+
   useEffect(() => {
     const loadUserInfo = async () => {
       try {
-        // Lấy chuỗi JSON đã lưu lúc đăng nhập
         const jsonValue = await SecureStore.getItemAsync('my-user-session');
         if (jsonValue) {
           const userData = JSON.parse(jsonValue);
-          console.log(">>> HOME USER DATA:", userData); // Xem log để biết tên biến là 'name', 'fullName' hay 'numberPhone'
+          console.log('>>> HOME USER DATA:', userData);
           setUser(userData);
         }
       } catch (e) {
-        console.error("Lỗi lấy thông tin user:", e);
+        console.error('Lỗi lấy thông tin user:', e);
       }
     };
 
@@ -74,16 +140,12 @@ export default function HomeScreen() {
           {item.name}
         </Text>
 
-        <Text style={styles.serviceCategory}>
-          Danh mục #{item.categoryId}
-        </Text>
+        <Text style={styles.serviceCategory}>Danh mục #{item.categoryId}</Text>
 
         <View style={styles.serviceDetails}>
           <View style={styles.ratingContainer}>
             <Star size={14} color={colors.warning} fill={colors.warning} />
-            <Text style={styles.rating}>
-              {item.rating ?? '4.8'}
-            </Text>
+            <Text style={styles.rating}>{item.rating ?? '4.8'}</Text>
             <Text style={styles.reviewCount}>
               ({item.reviewCount ?? 100})
             </Text>
@@ -99,7 +161,9 @@ export default function HomeScreen() {
           <Text style={styles.price}>{item.price}đ</Text>
           <View style={styles.durationContainer}>
             <Clock size={14} color="#9CA3AF" />
-            <Text style={styles.duration}>{item.duration ?? '30 phút'}</Text>
+            <Text style={styles.duration}>
+              {item.duration ?? '30 phút'}
+            </Text>
           </View>
         </View>
       </View>
@@ -118,7 +182,6 @@ export default function HomeScreen() {
       }
     >
       <View style={styles.categoryIcon}>
-        {/* Fix lỗi hiển thị icon nếu là link ảnh */}
         <Text style={styles.categoryEmoji}>{item.icon ?? '⭐'}</Text>
       </View>
       <Text style={styles.categoryName}>{item.name}</Text>
@@ -145,10 +208,12 @@ export default function HomeScreen() {
               <View style={styles.headerContent}>
                 <View>
                   <Text style={styles.greeting}>Xin chào 👋</Text>
-                  {/* 4. HIỂN THỊ TÊN THẬT */}
-                  {/* Code sẽ tự tìm: name -> fullName -> numberPhone -> Khách hàng */}
+
                   <Text style={styles.userName}>
-                    {user?.name || user?.fullName || user?.numberPhone || "Khách hàng"}
+                    {user?.name ||
+                      user?.fullName ||
+                      user?.numberPhone ||
+                      'Khách hàng'}
                   </Text>
                 </View>
 
@@ -189,14 +254,17 @@ export default function HomeScreen() {
               <Text style={styles.sectionTitle}>Danh mục dịch vụ</Text>
 
               {categoriesLoading && (
-                <ActivityIndicator color={colors.primaryAlt} style={{ marginTop: 20 }} />
+                <ActivityIndicator
+                  color={colors.primaryAlt}
+                  style={{ marginTop: 20 }}
+                />
               )}
 
               {categoriesError && (
                 <Text style={styles.errorText}>
-                    {categoriesError.includes('403') 
-                        ? 'Bạn chưa có quyền xem danh mục (Role User)' 
-                        : 'Không thể tải danh mục.'}
+                  {categoriesError.includes('403')
+                    ? 'Bạn chưa có quyền xem danh mục (Role User)'
+                    : 'Không thể tải danh mục.'}
                 </Text>
               )}
 
@@ -221,7 +289,10 @@ export default function HomeScreen() {
             </View>
 
             {servicesLoading && (
-              <ActivityIndicator color={colors.primaryAlt} style={{ marginTop: 30 }} />
+              <ActivityIndicator
+                color={colors.primaryAlt}
+                style={{ marginTop: 30 }}
+              />
             )}
 
             {servicesError && (
@@ -236,7 +307,7 @@ export default function HomeScreen() {
   );
 }
 
-/* ------------------------ STYLES (Giữ nguyên như cũ) ------------------------ */
+/* ------------------------ STYLES (GIỮ NGUYÊN 100%) ------------------------ */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
