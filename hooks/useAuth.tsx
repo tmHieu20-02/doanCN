@@ -1,125 +1,163 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-} from 'react';
-import * as SecureStore from 'expo-secure-store';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import * as SecureStore from "expo-secure-store";
+import axios, { AxiosError } from "axios";
+import { jwtDecode } from "jwt-decode";
 
-const USER_KEY = 'my-user-session'; // Key để lưu trữ
+// Cấu hình chung
+const BASE_URL = "https://phatdat.store/api/v1/auth";
+const USER_KEY = "my-user-session";
 
-// 1. Định nghĩa data mà Context sẽ cung cấp
+// Kiểu dữ liệu User
+interface UserSession {
+  token: string;
+  id: number;
+  numberPhone: string;
+  roleId: string | number;
+  [key: string]: any;
+}
+
+interface AuthResponse {
+  success: boolean;
+  data?: UserSession;
+  message?: string;
+}
+
 interface AuthContextData {
-  user: any;
-  isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<boolean>;
-  signUp: (params: {
-    name: string;
-    email: string;
-    password: string;
-  }) => Promise<boolean>;
+  user: UserSession | null;
+  isInitialized: boolean;
+  isLoading: boolean; // ← BẮT BUỘC CÓ
+  signIn: (params: { numberPhone: string; password: string }) => Promise<AuthResponse>;
+  signUp: (params: { full_name: string; email: string; numberPhone: string; password: string }) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
 }
 
-// 2. Tạo Context
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
-// 3. Tạo Provider (Component "gói" toàn bộ ứng dụng)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any>(null);
-  // Bắt đầu với isLoading = true để chờ kiểm tra storage
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<UserSession | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // ← ADD STATE
 
-  // 4. Thêm useEffect để tải user từ SecureStore khi app khởi động
+  // Load user từ SecureStore
   useEffect(() => {
     const loadUser = async () => {
       try {
-        // Lấy user (dưới dạng JSON string) từ storage
-        const userJson = await SecureStore.getItemAsync(USER_KEY);
-        if (userJson) {
-          setUser(JSON.parse(userJson)); // Chuyển JSON string về object
+        const stored = await SecureStore.getItemAsync(USER_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          console.log(">>> [AUTH] Khôi phục user:", parsed);
+          setUser(parsed);
         }
-      } catch (e) {
-        console.error('Không thể tải user từ storage', e);
+      } catch (err) {
+        console.log(">>> [AUTH] Lỗi load user:", err);
       } finally {
-        // Dù thành công hay thất bại, cũng phải dừng loading
-        setIsLoading(false);
+        setIsInitialized(true);
       }
     };
-
     loadUser();
   }, []);
 
-  // 5. Cập nhật các hàm của bạn (loại bỏ router.replace)
+  // LOGIN (ĐÃ FIX)
+  const signIn = async ({ numberPhone, password }: { numberPhone: string; password: string }): Promise<AuthResponse> => {
+    setIsLoading(true); // ← bật loading
 
-  // ✅ Đăng nhập
-  const signIn = async (email: string, password: string) => {
-    setIsLoading(true);
     try {
-      if (email === 'nguyenvana@gmail.com' && password === '123456') {
-        const loggedInUser = { email };
-        setUser(loggedInUser);
-        // Lưu user vào SecureStore
-        await SecureStore.setItemAsync(
-          USER_KEY,
-          JSON.stringify(loggedInUser)
-        );
-        // XÓA router.replace() - _layout.tsx sẽ tự động làm
-        return true;
+      console.log(`>>> [AUTH] Đang login: ${BASE_URL}/login`);
+      const res = await axios.post(`${BASE_URL}/login`, { numberPhone, password });
+
+      console.log(">>> [AUTH] Server trả về:", res.data);
+
+      // Lấy token
+      let token = res.data?.access_token;
+      if (!token) {
+        return { success: false, message: "Không tìm thấy token từ server." };
       }
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  // ✅ Đăng ký
-  const signUp = async ({ name, email, password }: {
-    name: string;
-    email: string;
-    password: string;
-  }) => {
-    setIsLoading(true);
-    try {
-      console.log('Đăng ký:', name, email);
-      const newUser = { name, email };
-      setUser(newUser);
-      // Lưu user vào SecureStore
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(newUser));
-      // XÓA router.replace() - _layout.tsx sẽ tự động làm
-      return true;
+      // Loại chữ Bearer
+      token = token.replace("Bearer ", "").trim();
+
+      // Decode token
+      const decoded: any = jwtDecode(token);
+      console.log(">>> [AUTH] Token decode:", decoded);
+
+      if (!decoded?.id || !decoded?.numberPhone) {
+        return { success: false, message: "Token không chứa đủ thông tin người dùng." };
+      }
+
+      // Tạo session từ token
+      const session: UserSession = {
+        token,
+        id: decoded.id,
+        numberPhone: decoded.numberPhone,
+        roleId: decoded.roleId,
+      };
+
+      // Lưu lại
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(session));
+      setUser(session);
+
+      return { success: true, data: session };
+
     } catch (err) {
-      console.error(err);
-      return false;
+      const error = err as AxiosError;
+      const msg =
+        (error.response?.data as any)?.mes ||
+        (error.response?.data as any)?.message ||
+        "Đăng nhập thất bại.";
+
+      console.log(">>> [AUTH] Lỗi login:", msg);
+      return { success: false, message: msg };
+
+    } finally {
+      setIsLoading(false); // ← tắt loading
+    }
+  };
+
+  // REGISTER
+  const signUp = async (data: { full_name: string; email: string; numberPhone: string; password: string }) => {
+    setIsLoading(true);
+
+    try {
+      const res = await axios.post(`${BASE_URL}/register`, data);
+      const ok = res.data?.err === 0 || res.data?.success === true;
+
+      return {
+        success: ok,
+        message: res.data?.mes || res.data?.message || (ok ? "Đăng ký thành công" : "Đăng ký thất bại"),
+      };
+
+    } catch (err) {
+      const error = err as AxiosError;
+      const msg = (error.response?.data as any)?.mes || "Lỗi kết nối server.";
+      return { success: false, message: msg };
+
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ✅ Đăng xuất
+  // LOGOUT
   const signOut = async () => {
-    setUser(null);
-    // Xóa user khỏi SecureStore
     await SecureStore.deleteItemAsync(USER_KEY);
-    // XÓA router.replace() - _layout.tsx sẽ tự động làm
+    setUser(null);
   };
 
-  // 6. Cung cấp các giá trị cho toàn bộ app
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, signIn, signUp, signOut }}
+      value={{
+        user,
+        isInitialized,
+        isLoading,     // ← BẮT BUỘC TRUYỀN VÀO
+        signIn,
+        signUp,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
 
-// 7. Tạo hook (giống hệt hook cũ của bạn, nhưng dùng Context)
-// Các component con sẽ dùng hook này để lấy data
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth phải được dùng bên trong AuthProvider');
-  }
-  return context;
+  return useContext(AuthContext);
 }

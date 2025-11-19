@@ -1,96 +1,159 @@
-// app/(auth)/register.tsx
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  SafeAreaView,
+  ActivityIndicator,
+  ScrollView,
+} from "react-native";
 
-import React, { useState } from 'react';
-import { 
-  View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  SafeAreaView, ActivityIndicator, ScrollView, Alert 
-} from 'react-native';
-import { useAuth } from '../../hooks/useAuth';
-import { Link, useRouter } from 'expo-router'; // <--- 1. Import useRouter
+import { useAuth } from "../../hooks/useAuth";
+import { Link, useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
 
 export default function RegisterScreen() {
   const { signUp, isLoading } = useAuth();
-  const router = useRouter(); // <--- 2. Khởi tạo router
+  const router = useRouter();
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [numberPhone, setNumberPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const handleSignUp = async () => {
-    if (!name || !email || !password || !confirmPassword) {
-      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin.");
+    if (!fullName || !email || !numberPhone || !password || !confirmPassword) {
+      Toast.show({
+        type: "error",
+        text1: "Thiếu thông tin",
+        text2: "Vui lòng nhập đầy đủ tất cả các trường.",
+      });
       return;
     }
-    if (password !== confirmPassword) {
-      Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp.");
+
+    if (fullName.length < 3) {
+      Toast.show({
+        type: "error",
+        text1: "Tên không hợp lệ",
+        text2: "Tên phải có ít nhất 3 ký tự.",
+      });
       return;
     }
+
+    if (!email.includes("@") || !email.includes(".")) {
+      Toast.show({
+        type: "error",
+        text1: "Email sai định dạng",
+        text2: "Vui lòng nhập email hợp lệ.",
+      });
+      return;
+    }
+
+    if (!/^[0-9]{10}$/.test(numberPhone)) {
+      Toast.show({
+        type: "error",
+        text1: "Số điện thoại không hợp lệ",
+        text2: "Số điện thoại phải gồm đúng 10 chữ số.",
+      });
+      return;
+    }
+
     if (password.length < 6) {
-      Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 6 ký tự.");
+      Toast.show({
+        type: "error",
+        text1: "Mật khẩu yếu",
+        text2: "Mật khẩu phải có ít nhất 6 ký tự.",
+      });
       return;
     }
 
-    const success = await signUp({ name, email, password });
+    if (password !== confirmPassword) {
+      Toast.show({
+        type: "error",
+        text1: "Xác nhận mật khẩu sai",
+        text2: "Mật khẩu xác nhận không khớp.",
+      });
+      return;
+    }
 
-    // 3. Xử lý điều hướng
-    if (success) {
-      // Đăng ký thành công
-      Alert.alert("Thành công", "Đăng ký thành công! Bạn đã được đăng nhập.");
-      // CHUYỂN HƯỚNG VÀO APP
-      router.replace('/(tabs)'); 
+    const response = await signUp({
+      full_name: fullName.trim(),
+      email: email.trim(),
+      numberPhone: numberPhone.trim(),
+      password: password.trim(),
+    });
+
+    console.log("REGISTER RESPONSE FRONT:", response);
+
+    if (response.success) {
+      Toast.show({
+        type: "success",
+        text1: "🎉 Đăng ký thành công",
+        text2: "Hãy kiểm tra email để lấy mã OTP.",
+        position: "top",
+      });
+
+      setTimeout(() => {
+        router.push({
+          pathname: "/(auth)/verify-otp",
+          params: { numberPhone: numberPhone.trim() },
+        });
+      }, 900);
+
     } else {
-      // Đăng ký thất bại
-      Alert.alert("Lỗi", "Đăng ký thất bại. Vui lòng thử lại.");
+      Toast.show({
+        type: "error",
+        text1: "Đăng ký thất bại",
+        text2: response.message,
+        position: "top",
+      });
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.title}>Tạo tài khoản mới</Text>
-          <Text style={styles.subtitle}>
-            Tham gia cộng đồng BookingApp để trải nghiệm dịch vụ tốt nhất.
-          </Text>
+          <Text style={styles.title}>Tạo tài khoản</Text>
         </View>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Họ và Tên</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ví dụ: Nguyễn Văn B"
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-          />
+          <Text style={styles.label}>Họ và tên</Text>
+          <TextInput style={styles.input} value={fullName} onChangeText={setFullName} />
 
           <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
-            placeholder="Ví dụ: nguyenvana@gmail.com"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
-            autoCapitalize="none"
+          />
+
+          <Text style={styles.label}>Số điện thoại</Text>
+          <TextInput
+            style={styles.input}
+            value={numberPhone}
+            onChangeText={setNumberPhone}
+            keyboardType="phone-pad"
           />
 
           <Text style={styles.label}>Mật khẩu</Text>
           <TextInput
             style={styles.input}
-            placeholder="Nhập mật khẩu (ít nhất 6 ký tự)"
+            secureTextEntry
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
           />
 
           <Text style={styles.label}>Xác nhận mật khẩu</Text>
           <TextInput
             style={styles.input}
-            placeholder="Nhập lại mật khẩu"
+            secureTextEntry
             value={confirmPassword}
             onChangeText={setConfirmPassword}
-            secureTextEntry
           />
 
           <TouchableOpacity
@@ -99,7 +162,7 @@ export default function RegisterScreen() {
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color="#FFF" />
             ) : (
               <Text style={styles.signUpButtonText}>Đăng ký</Text>
             )}
@@ -107,7 +170,6 @@ export default function RegisterScreen() {
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Đã có tài khoản?</Text>
-            {/* 4. Sửa Link sang đường dẫn tuyệt đối */}
             <Link href="/(auth)/login" asChild>
               <TouchableOpacity>
                 <Text style={styles.linkText}>Đăng nhập</Text>
@@ -120,72 +182,34 @@ export default function RegisterScreen() {
   );
 }
 
-// ... (Toàn bộ phần styles của bạn giữ nguyên)
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-  },
-  header: {
-    marginTop: 50,
-    marginBottom: 30,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  form: {
-    paddingBottom: 40,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 8,
-    marginTop: 16,
-  },
+  container: { flex: 1, paddingHorizontal: 20, backgroundColor: "#FFFDF5" },
+  header: { marginTop: 50, marginBottom: 30 },
+  title: { fontSize: 32, fontWeight: "800", color: "#2A2A2A" },
+  form: { paddingBottom: 40 },
+  label: { marginTop: 16, marginBottom: 5, fontSize: 15, color: "#6B6B6B", fontWeight: "600" },
   input: {
-    height: 50,
-    borderColor: '#E5E7EB',
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    backgroundColor: '#F9FAFB',
+    borderColor: "#E3D8A5",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    backgroundColor: "#FFFFFF",
+    color: "#2A2A2A",
   },
   signUpButton: {
-    height: 54,
-    backgroundColor: '#4F46E5',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 40,
-  },
-  signUpButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    backgroundColor: "#FFCC00",
+    padding: 16,
+    borderRadius: 16,
     marginTop: 20,
   },
-  footerText: {
+  signUpButtonText: {
+    color: "#222222",
+    textAlign: "center",
+    fontWeight: "700",
     fontSize: 16,
-    color: '#6B7280',
-    marginRight: 4,
   },
-  linkText: {
-    fontSize: 16,
-    color: '#4F46E5',
-    fontWeight: '600',
-  },
+  footer: { flexDirection: "row", justifyContent: "center", marginTop: 20 },
+  footerText: { marginRight: 5, color: "#6B6B6B" },
+  linkText: { color: "#FF9800", fontWeight: "700" },
 });
