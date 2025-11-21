@@ -1,92 +1,84 @@
-// app/(tabs)/_layout.tsx
+import { Tabs } from "expo-router";
+import { Home, User, Calendar, Bell, Search } from "lucide-react-native";
+import { colors } from "@/ui/theme";
 
-import { Tabs } from 'expo-router';
-import { Home, Calendar, User, Search, Bell } from 'lucide-react-native';
-import { useAuth } from '@/hooks/useAuth';
-import { Redirect } from 'expo-router'; // ← THÊM
-
-export default function TabLayout() {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading) return null;
-
-  // ❗ CHẶN STAFF KHÔNG ĐƯỢC VÀO TABS
-  if (user?.roleId === 2) {
-    return <Redirect href="/staff" />;   // ← CHỈ THÊM 1 DÒNG NÀY
-  }
-
-  if (!user) {
-    return null;
-  }
-
+export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: "#FACC15",
+        tabBarInactiveTintColor: "#9CA3AF",
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#E5E5E5',
-          height: 74,
-          paddingTop: 6,
-          paddingBottom: 10,
-
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 4,
-          elevation: 4,
+          position: "absolute",
+          bottom: 16,
+          left: 20,
+          right: 20,
+          height: 68,
+          backgroundColor: "#fff",
+          borderRadius: 26,
+          shadowColor: "#000",
+          shadowOpacity: 0.12,
+          shadowRadius: 12,
+          elevation: 8,
+          paddingBottom: 8,
         },
-
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '700',
-          marginTop: 3,
-        },
-
-        tabBarActiveTintColor: '#FFB300',
-        tabBarInactiveTintColor: '#9CA3AF',
       }}
     >
 
+      {/* --- 1. LỊCH HẸN (index) --- */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Trang chủ',
-          tabBarIcon: ({ size, color }) => <Home size={size} color={color} />,
+          title: "Lịch hẹn",
+          tabBarIcon: ({ color, size }) => (
+            <Home size={size} color={color} />
+          ),
         }}
       />
 
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: 'Tìm kiếm',
-          tabBarIcon: ({ size, color }) => <Search size={size} color={color} />,
-        }}
-      />
-
-      <Tabs.Screen
-        name="bookings"
-        options={{
-          title: 'Lịch hẹn',
-          tabBarIcon: ({ size, color }) => <Calendar size={size} color={color} />,
-        }}
-      />
-
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          title: 'Thông báo',
-          tabBarIcon: ({ size, color }) => <Bell size={size} color={color} />,
-        }}
-      />
-
+      {/* --- 2. HỒ SƠ (đổi lên vị trí thứ 2) --- */}
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Cá nhân',
-          tabBarIcon: ({ size, color }) => <User size={size} color={color} />,
+          title: "Hồ sơ",
+          tabBarIcon: ({ color, size }) => (
+            <User size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* --- 3. LỊCH SỬ (bookings) --- */}
+      <Tabs.Screen
+        name="bookings"
+        options={{
+          title: "Lịch sử",
+          tabBarIcon: ({ color, size }) => (
+            <Calendar size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* --- 4. THÔNG BÁO --- */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "Thông báo",
+          tabBarIcon: ({ color, size }) => (
+            <Bell size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* --- 5. SEARCH (đưa xuống cuối) --- */}
+      <Tabs.Screen
+        name="search"
+        options={{
+          title: "search",
+          tabBarIcon: ({ color, size }) => (
+            <Search size={size} color={color} />
+          ),
         }}
       />
 
