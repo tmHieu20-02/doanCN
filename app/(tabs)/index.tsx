@@ -48,54 +48,51 @@ export default function HomeScreen() {
   const [servicesError, setServicesError] = useState('');
 
   useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        setServicesLoading(true);
+  const fetchServices = async () => {
+    try {
+      setServicesLoading(true);
 
-        const session = await SecureStore.getItemAsync('my-user-session');
-        const token = session ? JSON.parse(session).token : null;
+      const session = await SecureStore.getItemAsync("my-user-session");
+      const token = session ? JSON.parse(session).token : null;
 
-        console.log('>>> TOKEN USER:', token);
+      const res = await fetch("https://phatdat.store/api/v1/service/get-all", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "*/*",
+        },
+      });
 
-        const res = await fetch('https://phatdat.store/api/v1/booking/get-all', {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: '*/*',
-          },
-        });
+      const json = await res.json();
 
-        const json = await res.json();
-        console.log('>>> BOOKING RAW:', json);
-
-        if (!json.data) {
-          setServicesError('Không thể tải dịch vụ.');
-          return;
-        }
-
-        // Convert Booking → Service để UI hoạt động
-        const mapped = json.data.map((b: any) => ({
-          id: b.service_id || b.id,
-          name: b.serviceName || 'Dịch vụ',
-          description: b.note || '',
-          image: b.image || 'https://picsum.photos/300',
-          price: b.price || 0,
-          duration: b.duration || '30 phút',
-          categoryId: 1,
-          rating: 4.5,
-          reviewCount: 10,
-        }));
-
-        setServices(mapped);
-      } catch (e: any) {
-        setServicesError('Không thể tải dịch vụ.');
-      } finally {
-        setServicesLoading(false);
+      if (!json.data) {
+        setServicesError("Không thể tải dịch vụ.");
+        return;
       }
-    };
 
-    fetchServices();
-  }, []);
+      const mapped = json.data.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description || "",
+        image: s.image || "https://picsum.photos/400",
+        price: s.price || 0,
+        duration: `${s.duration_minutes} phút`,
+        categoryId: s.category_id,
+        rating: 4.8,
+        reviewCount: 120,
+      }));
+
+      setServices(mapped);
+    } catch (e) {
+      setServicesError("Không thể tải dịch vụ.");
+    } finally {
+      setServicesLoading(false);
+    }
+  };
+
+  fetchServices();
+}, []);
+
 
   /* ------------------------------------------------------- */
 

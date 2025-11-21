@@ -1,175 +1,197 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
+  ScrollView,
+  Switch,
+  Alert,
 } from "react-native";
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { Plus } from "lucide-react-native";
+import { useRouter } from "expo-router";
 
-export default function StaffServices() {
+export default function CreateService() {
   const router = useRouter();
-  const { reload } = useLocalSearchParams();
 
-  const [services, setServices] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [duration, setDuration] = useState("");
+  const [price, setPrice] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [isActive, setIsActive] = useState(true);
 
-  const fetchServices = async () => {
+  const handleCreate = async () => {
+    if (!name || !description || !duration || !price || !categoryId) {
+      Alert.alert("Thiếu dữ liệu", "Vui lòng nhập đầy đủ các trường.");
+      return;
+    }
+
     try {
-      setLoading(true);
-
       const stored = await SecureStore.getItemAsync("my-user-session");
       const token = JSON.parse(stored!).token;
 
-      const res = await axios.get("https://phatdat.store/api/v1/service/get-all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const body = {
+        name,
+        description,
+        duration_minutes: Number(duration),
+        price: Number(price),
+        category_id: Number(categoryId),
+        is_active: isActive,
+      };
 
-      if (res.data?.data) setServices(res.data.data);
-      else setServices([]);
+      const res = await axios.post(
+        "https://phatdat.store/api/v1/service/create",
+        body,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+     if (res.status === 200 || res.status === 201) {
+  Alert.alert("Thành công", "Tạo dịch vụ thành công!");
+  router.push("/staff/(tabs)/services?reload=1");
+  return;
+}
+
+Alert.alert("Lỗi", res.data?.message || "Không tạo được dịch vụ.");
+
     } catch (err: any) {
-      console.log("Lỗi lấy dịch vụ:", err?.response?.data || err);
-    } finally {
-      setLoading(false);
+      Alert.alert("Lỗi server", "Không thể tạo dịch vụ.");
     }
   };
 
-  // load lần đầu
-  useEffect(() => {
-    fetchServices();
-  }, []);
-
-  // reload khi update/create xong
-  useEffect(() => {
-    if (reload) fetchServices();
-  }, [reload]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchServices();
-    setRefreshing(false);
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#FFB300" />
-        <Text style={{ marginTop: 12 }}>Đang tải dịch vụ...</Text>
-      </View>
-    );
-  }
-
-  const renderItem = ({ item }: any) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => router.push(`/staff/service/${item.id}`)}
-    >
-      <Text style={styles.name}>{item.name}</Text>
-      <Text style={styles.desc}>{item.description}</Text>
-
-      <View style={styles.row}>
-        <Text style={styles.price}>{item.price.toLocaleString()} đ</Text>
-        <Text style={styles.duration}>{item.duration_minutes} phút</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.header}>Danh sách dịch vụ</Text>
+    <ScrollView style={styles.container}>
+      <Text style={styles.title}>Tạo dịch vụ mới</Text>
 
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => router.push("/staff/service/create")}
-        >
-          <Plus color="#fff" size={20} />
-          <Text style={styles.addText}>Thêm</Text>
-        </TouchableOpacity>
+      <View style={styles.card}>
+        <Text style={styles.label}>Tên dịch vụ</Text>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="Nhập tên dịch vụ"
+          style={styles.input}
+        />
+
+        <Text style={styles.label}>Mô tả</Text>
+        <TextInput
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Mô tả chi tiết"
+          multiline
+          style={[styles.input, { height: 90 }]}
+        />
+
+        <Text style={styles.label}>Thời gian (phút)</Text>
+        <TextInput
+          value={duration}
+          onChangeText={setDuration}
+          placeholder="Ví dụ: 60"
+          keyboardType="numeric"
+          style={styles.input}
+        />
+
+        <Text style={styles.label}>Giá dịch vụ</Text>
+        <TextInput
+          value={price}
+          onChangeText={setPrice}
+          placeholder="Ví dụ: 1200000"
+          keyboardType="numeric"
+          style={styles.input}
+        />
+
+        <Text style={styles.label}>ID danh mục</Text>
+        <TextInput
+          value={categoryId}
+          onChangeText={setCategoryId}
+          placeholder="Nhập category_id"
+          keyboardType="numeric"
+          style={styles.input}
+        />
+
+        <View style={styles.switchRow}>
+          <Text style={styles.label}>Trạng thái</Text>
+          <Switch value={isActive} onValueChange={setIsActive} />
+        </View>
       </View>
 
-      <FlatList
-        data={services}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderItem}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        contentContainerStyle={{ paddingBottom: 20 }}
-        ListEmptyComponent={
-          <View style={styles.center}>
-            <Text style={{ color: "#777" }}>Không có dịch vụ nào</Text>
-          </View>
-        }
-      />
-    </View>
+      <TouchableOpacity style={styles.createButton} onPress={handleCreate}>
+        <Text style={styles.createText}>Tạo dịch vụ</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, flex: 1, backgroundColor: "#F5F6F8" },
-
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
+  container: {
+    padding: 18,
+    backgroundColor: "#F3F4F6",
   },
-  header: { fontSize: 22, fontWeight: "700" },
 
-  addButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFB300",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addText: {
-    color: "#fff",
-    fontWeight: "600",
-    marginLeft: 6,
+  title: {
+    fontSize: 28,
+    fontWeight: "700",
+    marginBottom: 18,
+    color: "#1F2937",
   },
 
   card: {
     backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    padding: 20,
+    borderRadius: 18,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 2,
   },
-  name: {
-    fontSize: 17,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  desc: {
-    fontSize: 13,
-    color: "#666",
-    marginBottom: 10,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  price: {
-    fontWeight: "700",
-    color: "#222",
-  },
-  duration: {
-    color: "#777",
+
+  label: {
+    fontSize: 15,
+    color: "#374151",
+    marginBottom: 6,
+    fontWeight: "600",
   },
 
-  center: {
-    flex: 1,
-    justifyContent: "center",
+  input: {
+    backgroundColor: "#F9FAFB",
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginBottom: 16,
+    fontSize: 15,
+  },
+
+  switchRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    marginTop: 6,
+  },
+
+  createButton: {
+    backgroundColor: "#2563EB",
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+
+    // hiệu ứng hiện đại
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  createText: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "700",
   },
 });

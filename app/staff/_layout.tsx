@@ -6,7 +6,8 @@ export default function StaffLayout() {
 
   // Nếu chưa login hoặc không phải staff → đẩy về UI user
   if (!user || user.roleId !== 2) {
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href="/staff/(tabs)" />;
+
   }
 
   return (
