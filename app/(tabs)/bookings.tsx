@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect } from 'expo-router';
+import * as SecureStore from "expo-secure-store";
 
 // Import API và Theme
 import api from '../../utils/api';
@@ -93,56 +94,62 @@ export default function BookingsScreen() {
 
   // Hàm gọi API lấy danh sách
   const fetchBookings = async () => {
-    try {
-      const res = await api.get('/booking/get-all');
-      const data = res.data; // Hoặc res.data.data tùy backend
+  try {
+    const session = await SecureStore.getItemAsync("my-user-session");
+    const user = session ? JSON.parse(session) : null;
+    const userId = user?.id;
 
-      console.log(">>> BOOKING DATA:", data);
+    if (!userId) return;
 
-      const list = Array.isArray(data) ? data : (data.data || []);
+    const res = await api.get("/booking/get-all"); // API hiện tại
 
-      // Phân loại dữ liệu vào các xô (bucket)
-      const up: Booking[] = [];
-      const com: Booking[] = [];
-      const can: Booking[] = [];
+    console.log(">>> RAW BOOKING API:", res.data);
 
-      list.forEach((item: any) => {
-        // Map dữ liệu từ Backend sang Frontend cho chuẩn
-        const booking: Booking = {
-          id: item.id,
-          serviceName: item.serviceName || item.service?.name || "Dịch vụ",
-          serviceType: item.categoryName || "Chăm sóc sắc đẹp",
-          date: item.bookingDate || item.date, 
-          time: item.bookingTime || item.time,
-          duration: item.duration || "60 phút",
-          price: item.totalPrice || item.price || 0,
-          status: item.status?.toLowerCase() || 'pending',
-          address: item.address || "Tại cửa hàng",
-        };
+    // Backend trả về: { bookings: [...], err: 0 }
+    const list = res.data.bookings || res.data.data || [];
 
-        // Logic phân loại tab
-        if (['cancelled', 'rejected', 'bom'].includes(booking.status)) {
-          can.push(booking);
-        } else if (['completed', 'done', 'finished'].includes(booking.status)) {
-          com.push(booking);
-        } else {
-          // pending, confirmed, approved...
-          booking.canCancel = true; // Chỉ cho hủy đơn sắp tới
-          up.push(booking);
-        }
-      });
+    // LỌC BOOKING THEO USER (fix quan trọng)
+    const userBookings = list.filter((b: any) => b.user_id === userId);
 
-      setUpcoming(up);
-      setCompleted(com);
-      setCancelled(can);
+    console.log(">>> FILTERED BOOKINGS FOR USER:", userBookings);
 
-    } catch (error) {
-      console.error("Lỗi lấy booking:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    // Phân loại booking
+    const up: Booking[] = [];
+    const com: Booking[] = [];
+    const can: Booking[] = [];
+
+   list.forEach((item: any) => {
+    
+  const booking: Booking = {
+    id: item.id,
+    serviceName: item.service?.name || "Dịch vụ",
+    serviceType: item.service?.category_name || "Không có danh mục",
+    date: item.booking_date,
+    time: item.start_time,
+    duration: `${item.service?.duration_minutes || 60} phút`,
+    price: item.total_price || item.service?.price || 0,
+    status: item.status?.toLowerCase() || "pending",
+    address: "Tại cửa hàng",
+    canCancel: true,
   };
+
+  if (["cancelled", "rejected", "bom"].includes(booking.status)) can.push(booking);
+  else if (["completed", "done"].includes(booking.status)) com.push(booking);
+  else up.push(booking);
+});
+
+
+    setUpcoming(up);
+    setCompleted(com);
+    setCancelled(can);
+  } catch (error) {
+    console.error("FETCH BOOKING ERROR:", error);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
+
 
   // Tự động tải lại khi vào màn hình này
   useFocusEffect(

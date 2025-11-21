@@ -5,8 +5,10 @@ export default function BookingLayout() {
     <Stack
       screenOptions={{
         headerShown: true,
-        headerTitle: "Đặt lịch",
       }}
-    />
+    >
+      <Stack.Screen name="index" options={{ title: "Đặt lịch" }} />
+      <Stack.Screen name="create" options={{ title: "Tạo lịch hẹn" }} />
+    </Stack>
   );
 }
