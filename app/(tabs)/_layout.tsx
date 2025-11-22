@@ -37,14 +37,13 @@ export default function TabsLayout() {
           ),
         }}
       />
-
-      {/* --- 2. HỒ SƠ (đổi lên vị trí thứ 2) --- */}
+  {/* --- 2. SEARCH (đưa xuống cuối) --- */}
       <Tabs.Screen
-        name="profile"
+        name="search"
         options={{
-          title: "Hồ sơ",
+          title: "search",
           tabBarIcon: ({ color, size }) => (
-            <User size={size} color={color} />
+            <Search size={size} color={color} />
           ),
         }}
       />
@@ -71,13 +70,14 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* --- 5. SEARCH (đưa xuống cuối) --- */}
+    
+       {/* --- 5. HỒ SƠ (đổi lên vị trí thứ 2) --- */}
       <Tabs.Screen
-        name="search"
+        name="profile"
         options={{
-          title: "search",
+          title: "Hồ sơ",
           tabBarIcon: ({ color, size }) => (
-            <Search size={size} color={color} />
+            <User size={size} color={color} />
           ),
         }}
       />

@@ -2,18 +2,22 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import axios, { AxiosError } from "axios";
 import { jwtDecode } from "jwt-decode";
-import { router } from "expo-router"; // ← THÊM
+import { router } from "expo-router";
 
-// Cấu hình chung
+// =============================
+// CONFIG
+// =============================
 const BASE_URL = "https://phatdat.store/api/v1/auth";
 const USER_KEY = "my-user-session";
 
-// Kiểu dữ liệu User
+// =============================
+// TYPES
+// =============================
 interface UserSession {
-  token: string;
+  token: string;          // luôn dạng "Bearer eyxxxx"
   id: number;
   numberPhone: string;
-  roleId: string | number;
+  roleId: number;
   [key: string]: any;
 }
 
@@ -27,24 +31,33 @@ interface AuthContextData {
   user: UserSession | null;
   isInitialized: boolean;
   isLoading: boolean;
-  signIn: (params: { numberPhone: string; password: string }) => Promise<AuthResponse>;
+
+  signIn: (params: {
+    numberPhone: string;
+    password: string;
+  }) => Promise<AuthResponse>;
+
   signUp: (params: {
     full_name: string;
     email: string;
     numberPhone: string;
     password: string;
   }) => Promise<{ success: boolean; message: string }>;
+
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
+// =============================
+// PROVIDER
+// =============================
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserSession | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load user từ SecureStore
+  // Load user đã lưu trong SecureStore
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -60,10 +73,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsInitialized(true);
       }
     };
+
     loadUser();
   }, []);
 
+  // =============================
   // LOGIN
+  // =============================
   const signIn = async ({
     numberPhone,
     password,
@@ -79,48 +95,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log(">>> [AUTH] Server trả về:", res.data);
 
-      // Lấy token
-      let token = res.data?.access_token;
-      if (!token) {
-        return { success: false, message: "Không tìm thấy token từ server." };
-      }
+      // BE trả: access_token = "Bearer eyJhbGciOi..."
+      const token = res.data?.access_token;
+      if (!token) return { success: false, message: "Không tìm thấy token từ server." };
 
-      // Loại chữ Bearer
-      token = token.replace("Bearer ", "").trim();
+      console.log(">>> TOKEN NHẬN TỪ SERVER:", token);
 
-      // Decode token
-      const decoded: any = jwtDecode(token);
+      // Decode: bỏ chữ Bearer
+      const decoded: any = jwtDecode(token.replace("Bearer ", ""));
       console.log(">>> [AUTH] Token decode:", decoded);
 
-      if (!decoded?.id || !decoded?.numberPhone) {
-        return { success: false, message: "Token không chứa đủ thông tin người dùng." };
-      }
+      if (!decoded?.id || !decoded?.numberPhone)
+        return { success: false, message: "Token không chứa đủ thông tin." };
 
-      // Chuẩn hóa roleId về number
       const roleIdNumber = Number(decoded.roleId);
 
-      // Tạo session từ token (GIỮ LOGIC CŨ, CHỈ CHỈNH roleId)
+      // Lưu session đầy đủ
       const session: UserSession = {
-        token,
+        token,  // giữ nguyên Bearer
         id: decoded.id,
         numberPhone: decoded.numberPhone,
         roleId: roleIdNumber,
       };
 
-      // Lưu lại
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(session));
       setUser(session);
 
-    // Điều hướng theo role
-if (roleIdNumber === 2) {
-  router.replace("/staff" as never);   // staff vào đây
-} else if (roleIdNumber === 3) {
-  router.replace("/(tabs)" as never);  // user
-}
- else if (roleIdNumber === 1) {
-  console.log(">>> [AUTH] Admin login - dùng web, không điều hướng trong app");
-}
+      console.log(">>> TOKEN SAU LƯU:", session.token);
 
+      // Điều hướng
+      if (roleIdNumber === 2) router.replace("/staff" as never);
+      else if (roleIdNumber === 3) router.replace("/(tabs)" as never);
+      else if (roleIdNumber === 1) console.log(">>> Admin – login tại web");
 
       return { success: true, data: session };
     } catch (err) {
@@ -137,7 +143,9 @@ if (roleIdNumber === 2) {
     }
   };
 
-  // REGISTER – giữ nguyên
+  // =============================
+  // REGISTER
+  // =============================
   const signUp = async (data: {
     full_name: string;
     email: string;
@@ -148,6 +156,7 @@ if (roleIdNumber === 2) {
 
     try {
       const res = await axios.post(`${BASE_URL}/register`, data);
+
       const ok = res.data?.err === 0 || res.data?.success === true;
 
       return {
@@ -166,12 +175,17 @@ if (roleIdNumber === 2) {
     }
   };
 
-  // LOGOUT – giữ nguyên
+  // =============================
+  // LOGOUT
+  // =============================
   const signOut = async () => {
     await SecureStore.deleteItemAsync(USER_KEY);
     setUser(null);
   };
 
+  // =============================
+  // RETURN CONTEXT
+  // =============================
   return (
     <AuthContext.Provider
       value={{
