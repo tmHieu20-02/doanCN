@@ -1,37 +1,57 @@
 import { useEffect } from "react";
-import { Slot, useRouter, useSegments } from "expo-router"; // Import các hook còn thiếu
+import { Slot, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import Toast from "react-native-toast-message";
 import { View, ActivityIndicator } from "react-native";
 
-// Import hook Auth
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useFrameworkReady } from "@/hooks/useFrameworkReady";
 
-// 1. Component con: Chịu trách nhiệm điều hướng & UI chính
 function RootLayoutNav() {
   const { user, isInitialized } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isInitialized) return; // Chưa check xong bộ nhớ thì thôi
+    if (!isInitialized) return;
 
-    // Kiểm tra xem user đang đứng ở nhóm route nào
     const inAuthGroup = segments[0] === "(auth)";
-    
-    // LOGIC BẢO VỆ:
-    if (user && inAuthGroup) {
-      // Đã login mà còn đứng ở trang Login/Register -> Đá vào trong
-      // Sửa đường dẫn này thành nơi bạn muốn (ví dụ: /(tabs)/bookings hoặc /(tabs)/home)
-      router.replace("/(tabs)/bookings"); 
-    } else if (!user && !inAuthGroup) {
-      // Chưa login mà đòi vào trang trong -> Đá ra trang Login
+
+    // ===========================
+    // 1. Chưa đăng nhập → ép vào Login
+    // ===========================
+    if (!user && !inAuthGroup) {
       router.replace("/(auth)/login");
+      return;
+    }
+
+    // ===========================
+    // 2. Đã đăng nhập mà còn ở nhóm (auth)
+    //    → Chuyển theo role
+    // ===========================
+    if (user && inAuthGroup) {
+      if (user.roleId === 2) {
+        router.replace("/staff");      // UI STAFF
+      } else if (user.roleId === 3) {
+        router.replace("/(tabs)");     // UI USER
+      }
+      return;
+    }
+
+    // ===========================
+    // 3. Người dùng đã đăng nhập
+    //    Nếu họ ở sai UI → ép đúng role
+    // ===========================
+    if (user) {
+      if (user.roleId === 2 && segments[0] !== "staff") {
+        router.replace("/staff");
+      }
+      if (user.roleId === 3 && segments[0] !== "(tabs)") {
+        router.replace("/(tabs)");
+      }
     }
   }, [user, isInitialized, segments]);
 
-  // Màn hình chờ (Splash) trong lúc đang check đăng nhập
   if (!isInitialized) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -49,7 +69,6 @@ function RootLayoutNav() {
   );
 }
 
-// 2. Component cha: Chỉ cung cấp Provider
 export default function RootLayout() {
   useFrameworkReady();
 

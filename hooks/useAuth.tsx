@@ -48,9 +48,10 @@ interface AuthContextData {
 
   signOut: () => Promise<void>;
 
-  refreshUser: () => Promise<void>;   // <— THÊM
+  refreshUser: () => Promise<void>;
 }
 
+// =============================
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
 // =============================
@@ -61,7 +62,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load user từ SecureStore
+  // =============================
+  // LOAD USER FROM SECURE STORE
+  // =============================
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -99,27 +102,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
       });
 
-      const token = res.data?.access_token;
+      // -------- FIX TOKEN CLEAN ----------
+      const rawToken = res.data?.access_token;
+      const token = rawToken?.replace("Bearer ", "");
       if (!token) return { success: false, message: "Không tìm thấy token từ server." };
 
-      const decoded: any = jwtDecode(token.replace("Bearer ", ""));
+      // Decode JWT
+      const decoded: any = jwtDecode(token);
 
-      if (!decoded?.id || !decoded?.numberPhone)
+      if (!decoded?.id || !decoded?.numberPhone) {
         return { success: false, message: "Token không hợp lệ." };
+      }
 
+      // SESSION SAVE
       const session: UserSession = {
         token,
         id: decoded.id,
         numberPhone: decoded.numberPhone,
         roleId: Number(decoded.roleId),
-        full_name: decoded.full_name || null, // <— THÊM
+        full_name: decoded.full_name || null,
       };
 
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(session));
       setUser(session);
 
-      if (session.roleId === 2) router.replace("/staff" as never);
-      else if (session.roleId === 3) router.replace("/(tabs)" as never);
+      // Redirect by role
+      if (session.roleId === 2) router.replace("/staff");
+      else if (session.roleId === 3) router.replace("/(tabs)");
 
       return { success: true, data: session };
     } catch (err) {
@@ -158,8 +167,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     } catch (err) {
       const error = err as AxiosError;
-      const msg = (error.response?.data as any)?.mes || "Lỗi kết nối server.";
-      return { success: false, message: msg };
+      return {
+        success: false,
+        message: (error.response?.data as any)?.mes || "Lỗi kết nối server.",
+      };
     } finally {
       setIsLoading(false);
     }
@@ -171,10 +182,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await SecureStore.deleteItemAsync(USER_KEY);
     setUser(null);
+    router.replace("/(auth)/login");
   };
 
   // =============================
-  // REFRESH USER (NEW)
+  // REFRESH USER
   // =============================
   const refreshUser = async () => {
     const stored = await SecureStore.getItemAsync(USER_KEY);
@@ -185,9 +197,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // =============================
-  // RETURN CONTEXT
-  // =============================
   return (
     <AuthContext.Provider
       value={{
@@ -197,7 +206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signOut,
-        refreshUser, // <— TRẢ RA CHO FE
+        refreshUser,
       }}
     >
       {children}
