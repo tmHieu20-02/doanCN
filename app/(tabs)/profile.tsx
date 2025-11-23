@@ -201,35 +201,42 @@ export default function ProfileScreen() {
               <Text style={styles.menuSectionTitle}>{section.title}</Text>
 
               <View style={styles.menuCard}>
-                {section.items.map((item, index) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[
-                      styles.menuItem,
-                      index === section.items.length - 1 && styles.menuItemLast,
-                    ]}
-                  >
-                    <View style={styles.menuItemLeft}>
-                      <View style={[styles.menuIcon, { backgroundColor: item.color + "18" }]}>
-                        {getIconComponent(item.icon, 20, item.color)}
-                      </View>
-                      <Text style={styles.menuItemText}>{item.name}</Text>
-                    </View>
+               {section.items.map((item, index) => (
+  <TouchableOpacity
+    key={item.id}
+   onPress={() => {
+  if (item.id === "edit-profile") {
+    router.push("../profile/edit"); 
+  }
+}}
 
-                    <View style={styles.menuItemRight}>
-                      {item.hasSwitch ? (
-                        <Switch
-                          value={notificationsEnabled}
-                          onValueChange={setNotificationsEnabled}
-                          trackColor={{ false: colors.border, true: colors.primary }}
-                          thumbColor="#FFF"
-                        />
-                      ) : (
-                        <ChevronRight size={20} color={colors.textMuted} />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
+    style={[
+      styles.menuItem,
+      index === section.items.length - 1 && styles.menuItemLast,
+    ]}
+  >
+    <View style={styles.menuItemLeft}>
+      <View style={[styles.menuIcon, { backgroundColor: item.color + "18" }]}>
+        {getIconComponent(item.icon, 20, item.color)}
+      </View>
+      <Text style={styles.menuItemText}>{item.name}</Text>
+    </View>
+
+    <View style={styles.menuItemRight}>
+      {item.hasSwitch ? (
+        <Switch
+          value={notificationsEnabled}
+          onValueChange={setNotificationsEnabled}
+          trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor="#FFF"
+        />
+      ) : (
+        <ChevronRight size={20} color={colors.textMuted} />
+      )}
+    </View>
+  </TouchableOpacity>
+))}
+
               </View>
             </View>
           ))}
