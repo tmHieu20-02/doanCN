@@ -1,6 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, User, Calendar, Bell, Search } from "lucide-react-native";
-import { colors } from "@/ui/theme";
+import { Home, User, Calendar, Bell } from "lucide-react-native";
 
 export default function TabsLayout() {
   return (
@@ -27,7 +26,7 @@ export default function TabsLayout() {
       }}
     >
 
-      {/* --- 1. LỊCH HẸN (index) --- */}
+      {/* --- 1. LỊCH HẸN --- */}
       <Tabs.Screen
         name="index"
         options={{
@@ -37,18 +36,18 @@ export default function TabsLayout() {
           ),
         }}
       />
-  {/* --- 2. SEARCH (đưa xuống cuối) --- */}
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: "search",
-          tabBarIcon: ({ color, size }) => (
-            <Search size={size} color={color} />
-          ),
-        }}
-      />
 
-      {/* --- 3. LỊCH SỬ (bookings) --- */}
+      {/* --- ẨN HOÀN TOÀN SEARCH KHỎI TAB BAR --- */}
+      <Tabs.Screen
+  name="search"
+  options={{
+    href: null,        // ẨN HOÀN TOÀN KHỎI TAB BAR
+    headerShown: false,
+  }}
+/>
+
+
+      {/* --- 2. LỊCH SỬ --- */}
       <Tabs.Screen
         name="bookings"
         options={{
@@ -59,7 +58,7 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* --- 4. THÔNG BÁO --- */}
+      {/* --- 3. THÔNG BÁO --- */}
       <Tabs.Screen
         name="notifications"
         options={{
@@ -70,8 +69,7 @@ export default function TabsLayout() {
         }}
       />
 
-    
-       {/* --- 5. HỒ SƠ (đổi lên vị trí thứ 2) --- */}
+      {/* --- 4. HỒ SƠ --- */}
       <Tabs.Screen
         name="profile"
         options={{

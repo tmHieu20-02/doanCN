@@ -7,36 +7,33 @@ import {
   TextInput,
   FlatList,
   SafeAreaView,
+  Image,
   ActivityIndicator,
 } from "react-native";
-import { Search, SlidersHorizontal, Clock } from "lucide-react-native";
+import { Search, SlidersHorizontal, MapPin, Clock } from "lucide-react-native";
 import { Link, useLocalSearchParams } from "expo-router";
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
-
-// Theme
 import { colors, radius, shadow } from "@/ui/theme";
 
 const API_BASE = "https://phatdat.store";
 
 export default function SearchScreen() {
-  const { category, q } = useLocalSearchParams<{ category: string; q: string }>();
+  const { category, q } =
+    useLocalSearchParams<{ category: string; q: string }>();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  /* ------------------------------------------
-        SET DEFAULT SEARCH (CATEGORY or q)
-  ------------------------------------------- */
   useEffect(() => {
     if (category) setSearchQuery(category);
     else if (q) setSearchQuery(q);
   }, [category, q]);
 
-  /* ------------------------------------------
-        FETCH SERVICES (SEARCH)
-  ------------------------------------------- */
+  /* ================================
+          CALL API SEARCH
+  ================================= */
   const fetchServices = async () => {
     try {
       setLoading(true);
@@ -46,10 +43,7 @@ export default function SearchScreen() {
 
       const res = await axios.get(`${API_BASE}/api/v1/service/get-all`, {
         params: { search: searchQuery },
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "*/*",
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = res.data?.data || [];
@@ -60,11 +54,12 @@ export default function SearchScreen() {
         categoryName: s.category?.name ?? "Không có danh mục",
         price: s.price,
         duration: `${s.duration_minutes} phút`,
+        image: s.image || "https://picsum.photos/300", // tránh lỗi null image
       }));
 
       setServices(mapped);
-    } catch (err: any) {
-      console.log("Search error:", err.response?.data || err);
+    } catch (err) {
+      console.log("Search error:", err);
     } finally {
       setLoading(false);
     }
@@ -74,36 +69,43 @@ export default function SearchScreen() {
     fetchServices();
   }, [searchQuery]);
 
-  /* ------------------------------------------
-        RENDER CARD
-  ------------------------------------------- */
+  /* ===================================
+          RENDER ITEM (GIỐNG CHỢ TỐT)
+  ====================================*/
   const renderItem = ({ item }: any) => (
-    <View style={styles.card}>
-      <Text style={styles.serviceName}>{item.name}</Text>
-      <Text style={styles.categoryText}>{item.categoryName}</Text>
+    <Link
+      href={{
+        pathname: "/booking",
+        params: { serviceId: item.id.toString() },
+      }}
+      asChild
+    >
+      <TouchableOpacity style={styles.rowCard}>
+        {/* ==== IMAGE LEFT ==== */}
+        <Image source={{ uri: item.image }} style={styles.cardImage} />
 
-      <View style={styles.metaRow}>
-        <Text style={styles.price}>{item.price}đ</Text>
+        {/* ==== CONTENT RIGHT ==== */}
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {item.name}
+          </Text>
 
-        <View style={styles.durationRow}>
-          <Clock size={14} color={colors.textMuted} />
-          <Text style={styles.durationText}>{item.duration}</Text>
+          <Text style={styles.cardCategory}>{item.categoryName}</Text>
+
+          <Text style={styles.cardPrice}>{item.price}đ</Text>
+
+          <View style={styles.cardMeta}>
+            <Clock size={14} color={colors.textMuted} />
+            <Text style={styles.cardDuration}>{item.duration}</Text>
+          </View>
+
+          {/* BUTTON */}
+          <TouchableOpacity style={styles.cardButton}>
+            <Text style={styles.cardButtonText}>Đặt lịch</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Booking link */}
-      <Link
-        href={{
-          pathname: "/booking",
-          query: { serviceId: item.id.toString() },
-        }}
-        asChild
-      >
-        <TouchableOpacity style={styles.bookBtn}>
-          <Text style={styles.bookBtnText}>Đặt lịch</Text>
-        </TouchableOpacity>
-      </Link>
-    </View>
+      </TouchableOpacity>
+    </Link>
   );
 
   return (
@@ -144,21 +146,18 @@ export default function SearchScreen() {
           data={services}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={{ paddingBottom: 50 }}
+          contentContainerStyle={{ paddingBottom: 50, paddingTop: 10 }}
         />
       )}
     </SafeAreaView>
   );
 }
 
-/* ------------------------------------------
-        STYLES – VIP PREMIUM
-------------------------------------------- */
+/* =====================================
+          STYLES - CHỢ TỐT STYLE
+===================================== */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
 
   header: {
     backgroundColor: colors.primary,
@@ -168,16 +167,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: radius.lg,
     borderBottomRightRadius: radius.lg,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#000",
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: "#4B5563",
-    marginTop: 4,
-  },
+  headerTitle: { fontSize: 24, fontWeight: "700", color: "#000" },
+  headerSubtitle: { fontSize: 14, color: "#4B5563", marginTop: 4 },
 
   searchRow: {
     flexDirection: "row",
@@ -185,7 +176,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 18,
   },
-
   searchInputWrapper: {
     flex: 1,
     backgroundColor: colors.card,
@@ -197,14 +187,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-
-  searchInput: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 15,
-    color: colors.text,
-  },
-
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: colors.text },
   filterBtn: {
     marginLeft: 12,
     backgroundColor: colors.primaryLight,
@@ -214,60 +197,62 @@ const styles = StyleSheet.create({
     borderColor: colors.primaryDark,
   },
 
-  card: {
+  /* === CHỢ TỐT CARD === */
+  rowCard: {
+    flexDirection: "row",
     backgroundColor: colors.card,
     marginHorizontal: 20,
-    marginTop: 16,
-    padding: 18,
-    borderRadius: radius.xl,
+    marginBottom: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: "hidden",
     ...shadow.card,
   },
-
-  serviceName: {
-    fontSize: 18,
+  cardImage: {
+    width: 110,
+    height: 110,
+  },
+  cardBody: {
+    flex: 1,
+    padding: 12,
+  },
+  cardTitle: {
+    fontSize: 16,
     fontWeight: "700",
     color: colors.text,
-    marginBottom: 4,
   },
-
-  categoryText: {
-    fontSize: 14,
+  cardCategory: {
+    fontSize: 13,
     color: colors.textMuted,
-    marginBottom: 12,
+    marginTop: 2,
   },
-
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
-  },
-
-  price: {
-    fontSize: 18,
+  cardPrice: {
+    fontSize: 16,
     fontWeight: "700",
     color: colors.primaryAlt,
+    marginTop: 6,
   },
-
-  durationRow: {
+  cardMeta: {
     flexDirection: "row",
     alignItems: "center",
+    marginTop: 6,
   },
-  durationText: {
+  cardDuration: {
     marginLeft: 6,
     color: colors.textMuted,
+    fontSize: 12,
   },
 
-  bookBtn: {
+  cardButton: {
     backgroundColor: colors.primary,
-    paddingVertical: 12,
-    borderRadius: radius.lg,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    marginTop: 10,
   },
-  bookBtnText: {
-    fontSize: 16,
+  cardButtonText: {
     textAlign: "center",
+    fontSize: 14,
     fontWeight: "600",
     color: "#000",
   },
