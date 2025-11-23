@@ -41,61 +41,59 @@ export default function HomeScreen() {
     useCategories();
 
   /* ---------------------------------------------------------
-        FINAL: LẤY DỊCH VỤ QUA API BOOKING (User không có quyền service)
+        LẤY DỊCH VỤ (USER-Không-quyền-service)
   ----------------------------------------------------------*/
   const [services, setServices] = useState<Service[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState('');
 
   useEffect(() => {
-  const fetchServices = async () => {
-    try {
-      setServicesLoading(true);
+    const fetchServices = async () => {
+      try {
+        setServicesLoading(true);
 
-      const session = await SecureStore.getItemAsync("my-user-session");
-      const token = session ? JSON.parse(session).token : null;
+        const session = await SecureStore.getItemAsync("my-user-session");
+        const token = session ? JSON.parse(session).token : null;
 
-      const res = await fetch("https://phatdat.store/api/v1/service/get-all", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "*/*",
-        },
-      });
+        const res = await fetch("https://phatdat.store/api/v1/service/get-all", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "*/*",
+          },
+        });
 
-      const json = await res.json();
+        const json = await res.json();
 
-      if (!json.data) {
+        if (!json.data) {
+          setServicesError("Không thể tải dịch vụ.");
+          return;
+        }
+
+        const mapped = json.data.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description || "",
+          image: s.image || "https://picsum.photos/400",
+          price: s.price || 0,
+          duration: `${s.duration_minutes} phút`,
+          categoryId: s.category_id,
+          rating: 4.8,
+          reviewCount: 120,
+        }));
+
+        setServices(mapped);
+      } catch (e) {
         setServicesError("Không thể tải dịch vụ.");
-        return;
+      } finally {
+        setServicesLoading(false);
       }
+    };
 
-      const mapped = json.data.map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        description: s.description || "",
-        image: s.image || "https://picsum.photos/400",
-        price: s.price || 0,
-        duration: `${s.duration_minutes} phút`,
-        categoryId: s.category_id,
-        rating: 4.8,
-        reviewCount: 120,
-      }));
+    fetchServices();
+  }, []);
 
-      setServices(mapped);
-    } catch (e) {
-      setServicesError("Không thể tải dịch vụ.");
-    } finally {
-      setServicesLoading(false);
-    }
-  };
-
-  fetchServices();
-}, []);
-
-
-  /* ------------------------------------------------------- */
-
+  /* ------------------ LẤY USER TỪ SECURESTORE ------------------ */
   useEffect(() => {
     const loadUserInfo = async () => {
       try {
@@ -206,21 +204,26 @@ export default function HomeScreen() {
                 <View>
                   <Text style={styles.greeting}>Xin chào 👋</Text>
 
+                  {/* === FIX HIỂN THỊ TÊN === */}
                   <Text style={styles.userName}>
-                    {user?.name ||
+                    {user?.full_name ||
                       user?.fullName ||
+                      user?.name ||
                       user?.numberPhone ||
                       'Khách hàng'}
                   </Text>
                 </View>
 
+                {/* === FIX AVATAR === */}
                 <TouchableOpacity
                   style={styles.avatarContainer}
                   onPress={() => router.push('/(tabs)/profile')}
                 >
                   <Image
                     source={{
-                      uri: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg',
+                      uri:
+                        user?.avatar ||
+                        "https://phatdat.store/default-avatar.png",
                     }}
                     style={styles.avatar}
                   />
@@ -303,6 +306,7 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
+
 
 /* ------------------------ STYLES (GIỮ NGUYÊN 100%) ------------------------ */
 const styles = StyleSheet.create({

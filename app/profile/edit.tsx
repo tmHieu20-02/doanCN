@@ -15,7 +15,8 @@ import { colors, spacing, radius, shadow } from "@/ui/theme";
 import { ArrowLeft, Save, User, Phone, UserCircle2 } from "lucide-react-native";
 
 import { useAuth } from "@/hooks/useAuth";
-import { updateUser } from "../../utils/updateUser";   // <— ĐÚNG ĐƯỜNG DẪN
+import { updateUser } from "../../utils/updateUser";
+import * as SecureStore from "expo-secure-store";
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -25,17 +26,16 @@ export default function EditProfileScreen() {
   const [gender, setGender] = useState("");
   const [phone, setPhone] = useState("");
 
-  /* Load dữ liệu user vào input */
   useEffect(() => {
     if (user) {
-      setFullName(user.full_name || user.fullName || "");
+      setFullName(user.full_name || "");
       setGender(user.gender || "");
       setPhone(user.numberPhone || "");
     }
   }, [user]);
 
   /* ============================
-        HANDLE SAVE
+          HANDLE SAVE
   ============================ */
   const handleSave = async () => {
     const payload = {
@@ -49,6 +49,15 @@ export default function EditProfileScreen() {
     if (res?.err === 1) {
       alert("Lỗi cập nhật: " + res.mes);
       return;
+    }
+
+    // Lưu lại vào SecureStore
+    const stored = await SecureStore.getItemAsync("my-user-session");
+    if (stored) {
+      const session = JSON.parse(stored);
+      session.full_name = fullName;
+      session.gender = gender;
+      await SecureStore.setItemAsync("my-user-session", JSON.stringify(session));
     }
 
     alert("Cập nhật thành công!");
@@ -145,7 +154,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
-
   banner: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing(4),
@@ -175,7 +183,6 @@ const styles = StyleSheet.create({
     marginTop: spacing(1),
     opacity: 0.9,
   },
-
   avatarWrapper: {
     position: "absolute",
     top: 130,
@@ -191,7 +198,6 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
     ...shadow.card,
   },
-
   form: {
     marginTop: spacing(16),
     paddingHorizontal: spacing(4),
@@ -202,7 +208,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing(4),
   },
-
   inputGroup: {
     flexDirection: "row",
     alignItems: "center",
@@ -220,7 +225,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
-
   saveBtn: {
     backgroundColor: colors.primaryDark,
     flexDirection: "row",

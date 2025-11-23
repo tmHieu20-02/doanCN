@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -37,9 +37,7 @@ import * as ImagePicker from "expo-image-picker";
 import { uploadAvatar } from "@/utils/uploadAvatar";
 import { colors, radius, shadow, spacing } from "@/ui/theme";
 
-/* ================================
-      MENU CONFIG
-================================ */
+/* ================================ MENU CONFIG ================================ */
 
 const menuSections = [
   {
@@ -61,15 +59,12 @@ const menuSections = [
   },
 ];
 
-/* ================================
-        MAIN COMPONENT
-================================ */
+/* ================================ MAIN COMPONENT ================================ */
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, signOut } = useAuth();
 
-  // Avatar local hoặc từ session
   const [avatarUrl, setAvatarUrl] = useState(
     user?.avatar ? user.avatar : "https://phatdat.store/default-avatar.png"
   );
@@ -77,6 +72,27 @@ export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
+
+  /* ===================== FIX QUAN TRỌNG: SYNC SESSION SAU UPDATE ===================== */
+
+  useEffect(() => {
+    const syncSession = async () => {
+      const stored = await SecureStore.getItemAsync("my-user-session");
+      if (stored) {
+        const data = JSON.parse(stored);
+
+       if (user && data.full_name) {
+  user.full_name = data.full_name;
+}
+
+        if (data.avatar) setAvatarUrl(data.avatar);
+      }
+    };
+
+    syncSession();
+  }, []);
+
+  /* ================================ AVATAR PICKER ================================ */
 
   const openPickerSheet = () => {
     setShowPicker(true);
@@ -88,10 +104,6 @@ export default function ProfileScreen() {
       setShowPicker(false)
     );
   };
-
-  /* ================================
-          CHANGE AVATAR
-  ================================= */
 
   const handleChangeAvatar = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -109,10 +121,8 @@ export default function ProfileScreen() {
 
     const imageUri = result.assets[0].uri;
 
-    // Hiện avatar ngay lập tức (local)
     setAvatarUrl(imageUri);
 
-    // Lưu vào SecureStore
     const stored = await SecureStore.getItemAsync("my-user-session");
     if (stored) {
       const session = JSON.parse(stored);
@@ -120,16 +130,11 @@ export default function ProfileScreen() {
       await SecureStore.setItemAsync("my-user-session", JSON.stringify(session));
     }
 
-    // Upload lên BE
-    const res = await uploadAvatar(imageUri);
-    console.log("UPLOAD RESPONSE RAW:", res);
-
+    await uploadAvatar(imageUri);
     alert("Cập nhật ảnh đại diện thành công!");
   };
 
-  /* ================================
-          ICON RENDER
-  ================================= */
+  /* ================================ RENDER ================================ */
 
   const getIconComponent = (name: string, size = 20, color: string) => {
     const p = { size, color };
@@ -147,14 +152,10 @@ export default function ProfileScreen() {
     }
   };
 
-  /* ================================
-          RENDER UI
-  ================================= */
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-
+        
         {/* HEADER */}
         <LinearGradient colors={[colors.primary, colors.primaryAlt]} style={styles.header}>
           <View style={styles.headerTopRow}>
@@ -168,13 +169,10 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* AVATAR */}
+          {/* PROFILE */}
           <View style={styles.profileSection}>
             <View style={styles.avatarContainer}>
-              <Image
-                source={{ uri: avatarUrl }}
-                style={styles.avatar}
-              />
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
 
               <TouchableOpacity style={styles.editAvatarButton} onPress={openPickerSheet}>
                 <Edit3 size={16} color={colors.primaryDark} />
@@ -182,8 +180,8 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.profileInfo}>
-              <Text style={styles.userName}>{user?.fullName ?? "Người dùng"}</Text>
-              <Text style={styles.userEmail}>{user?.email}</Text>
+              <Text style={styles.userName}>{user?.full_name || "Người dùng"}</Text>
+              {user?.email && <Text style={styles.userEmail}>{user.email}</Text>}
               {user?.numberPhone && <Text style={styles.userPhone}>{user.numberPhone}</Text>}
 
               <View style={styles.membershipBadge}>
@@ -201,42 +199,40 @@ export default function ProfileScreen() {
               <Text style={styles.menuSectionTitle}>{section.title}</Text>
 
               <View style={styles.menuCard}>
-               {section.items.map((item, index) => (
-  <TouchableOpacity
-    key={item.id}
-   onPress={() => {
-  if (item.id === "edit-profile") {
-    router.push("../profile/edit"); 
-  }
-}}
+                {section.items.map((item, index) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() => {
+                      if (item.id === "edit-profile") {
+                        router.push("../profile/edit");
+                      }
+                    }}
+                    style={[
+                      styles.menuItem,
+                      index === section.items.length - 1 && styles.menuItemLast,
+                    ]}
+                  >
+                    <View style={styles.menuItemLeft}>
+                      <View style={[styles.menuIcon, { backgroundColor: item.color + "18" }]}>
+                        {getIconComponent(item.icon, 20, item.color)}
+                      </View>
+                      <Text style={styles.menuItemText}>{item.name}</Text>
+                    </View>
 
-    style={[
-      styles.menuItem,
-      index === section.items.length - 1 && styles.menuItemLast,
-    ]}
-  >
-    <View style={styles.menuItemLeft}>
-      <View style={[styles.menuIcon, { backgroundColor: item.color + "18" }]}>
-        {getIconComponent(item.icon, 20, item.color)}
-      </View>
-      <Text style={styles.menuItemText}>{item.name}</Text>
-    </View>
-
-    <View style={styles.menuItemRight}>
-      {item.hasSwitch ? (
-        <Switch
-          value={notificationsEnabled}
-          onValueChange={setNotificationsEnabled}
-          trackColor={{ false: colors.border, true: colors.primary }}
-          thumbColor="#FFF"
-        />
-      ) : (
-        <ChevronRight size={20} color={colors.textMuted} />
-      )}
-    </View>
-  </TouchableOpacity>
-))}
-
+                    <View style={styles.menuItemRight}>
+                      {item.hasSwitch ? (
+                        <Switch
+                          value={notificationsEnabled}
+                          onValueChange={setNotificationsEnabled}
+                          trackColor={{ false: colors.border, true: colors.primary }}
+                          thumbColor="#FFF"
+                        />
+                      ) : (
+                        <ChevronRight size={20} color={colors.textMuted} />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           ))}
@@ -304,9 +300,7 @@ export default function ProfileScreen() {
   );
 }
 
-/* ================================
-            STYLES
-================================ */
+/* ================================ STYLES ================================ */
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },

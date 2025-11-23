@@ -8,33 +8,20 @@ export const updateUser = async (payload: any) => {
 
     console.log("SESSION:", session);
 
-    if (!session?.token || !session?.id) {
-      return { err: 1, mes: "Missing token or user id" };
+    if (!session?.token) {
+      return { err: 1, mes: "Missing token" };
     }
 
- const url = `https://phatdat.store/api/v1/user/update-user`;
-
-
+    const url = `https://phatdat.store/api/v1/user/update-user`;
 
     const tokenToSend = session.token.startsWith("Bearer ")
       ? session.token
       : `Bearer ${session.token}`;
-      console.log(">>> FINAL REQUEST:", {
-  url,
-  headers: {
-    Authorization: tokenToSend,
-    "Content-Type": "application/json",
-  },
-  payload,
-});
-
 
     const res = await axios.put(url, payload, {
       headers: {
-        "Content-Type": "application/json",
-
-        // FIX QUAN TRỌNG:
         Authorization: tokenToSend,
+        "Content-Type": "application/json",
       },
     });
 

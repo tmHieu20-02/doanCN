@@ -14,10 +14,12 @@ const USER_KEY = "my-user-session";
 // TYPES
 // =============================
 interface UserSession {
-  token: string;          // luôn dạng "Bearer eyxxxx"
+  token: string;
   id: number;
   numberPhone: string;
   roleId: number;
+  full_name?: string | null;
+  gender?: string | null;
   [key: string]: any;
 }
 
@@ -45,6 +47,8 @@ interface AuthContextData {
   }) => Promise<{ success: boolean; message: string }>;
 
   signOut: () => Promise<void>;
+
+  refreshUser: () => Promise<void>;   // <— THÊM
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -57,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load user đã lưu trong SecureStore
+  // Load user từ SecureStore
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -90,43 +94,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
 
     try {
-      console.log(`>>> [AUTH] Đang login: ${BASE_URL}/login`);
-      const res = await axios.post(`${BASE_URL}/login`, { numberPhone, password });
+      const res = await axios.post(`${BASE_URL}/login`, {
+        numberPhone,
+        password,
+      });
 
-      console.log(">>> [AUTH] Server trả về:", res.data);
-
-      // BE trả: access_token = "Bearer eyJhbGciOi..."
       const token = res.data?.access_token;
       if (!token) return { success: false, message: "Không tìm thấy token từ server." };
 
-      console.log(">>> TOKEN NHẬN TỪ SERVER:", token);
-
-      // Decode: bỏ chữ Bearer
       const decoded: any = jwtDecode(token.replace("Bearer ", ""));
-      console.log(">>> [AUTH] Token decode:", decoded);
 
       if (!decoded?.id || !decoded?.numberPhone)
-        return { success: false, message: "Token không chứa đủ thông tin." };
+        return { success: false, message: "Token không hợp lệ." };
 
-      const roleIdNumber = Number(decoded.roleId);
-
-      // Lưu session đầy đủ
       const session: UserSession = {
-        token,  // giữ nguyên Bearer
+        token,
         id: decoded.id,
         numberPhone: decoded.numberPhone,
-        roleId: roleIdNumber,
+        roleId: Number(decoded.roleId),
+        full_name: decoded.full_name || null, // <— THÊM
       };
 
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(session));
       setUser(session);
 
-      console.log(">>> TOKEN SAU LƯU:", session.token);
-
-      // Điều hướng
-      if (roleIdNumber === 2) router.replace("/staff" as never);
-      else if (roleIdNumber === 3) router.replace("/(tabs)" as never);
-      else if (roleIdNumber === 1) console.log(">>> Admin – login tại web");
+      if (session.roleId === 2) router.replace("/staff" as never);
+      else if (session.roleId === 3) router.replace("/(tabs)" as never);
 
       return { success: true, data: session };
     } catch (err) {
@@ -135,8 +128,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         (error.response?.data as any)?.mes ||
         (error.response?.data as any)?.message ||
         "Đăng nhập thất bại.";
-
-      console.log(">>> [AUTH] Lỗi login:", msg);
       return { success: false, message: msg };
     } finally {
       setIsLoading(false);
@@ -156,7 +147,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const res = await axios.post(`${BASE_URL}/register`, data);
-
       const ok = res.data?.err === 0 || res.data?.success === true;
 
       return {
@@ -184,6 +174,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // =============================
+  // REFRESH USER (NEW)
+  // =============================
+  const refreshUser = async () => {
+    const stored = await SecureStore.getItemAsync(USER_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      console.log(">>> [AUTH] REFRESH USER:", parsed);
+      setUser(parsed);
+    }
+  };
+
+  // =============================
   // RETURN CONTEXT
   // =============================
   return (
@@ -195,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signOut,
+        refreshUser, // <— TRẢ RA CHO FE
       }}
     >
       {children}
