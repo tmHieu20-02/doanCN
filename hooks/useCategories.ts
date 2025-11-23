@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
-import api from "../utils/api";
-import * as SecureStore from "expo-secure-store";
 
 export type Category = {
   id: number;
   name: string;
   description?: string;
   image?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 
   filterKey: string;
   color: string;
@@ -25,35 +23,33 @@ export function useCategories() {
       try {
         setIsLoading(true);
 
-        const session = await SecureStore.getItemAsync("my-user-session");
-        const token = session ? JSON.parse(session).token : null;
+        // ❗ API category không cần token
+        const res = await fetch("https://phatdat.store/api/v1/category/get-all");
 
-        if (!token) {
-          setError("Missing access token");
-          setIsLoading(false);
+        const json = await res.json();
+
+        if (json.err !== 0 || !json.data) {
+          setError(json.mes || "Không thể tải danh mục");
           return;
         }
 
-        const res = await api.get("/api/v1/category/get-all", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // ⭐ MAP DỮ LIỆU CHO UI
+        const mapped = json.data.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          description: c.description || "",
+          image: c.image || "",
+          createdAt: c.createdAt || "",
+          updatedAt: c.updatedAt || "",
 
-        if (res.data.err !== 0) {
-          setError(res.data.mes || "Không thể tải danh mục");
-          return;
-        }
+          filterKey: c.name?.toLowerCase() ?? "",
+          color: "#F59E0B",
+          icon: "⭐",
+        }));
 
-        // ⭐ MAP DỮ LIỆU ĐỂ UI KHÔNG BỊ LỖI
-        setCategories(
-          (res.data.categories || []).map((c: any) => ({
-            ...c,
-            filterKey: c.name?.toLowerCase() ?? "",
-            color: "#F59E0B",
-            icon: "⭐",
-          }))
-        );
+        setCategories(mapped);
       } catch (e: any) {
-        setError(e.message);
+        setError(e.message || "Lỗi kết nối server");
       } finally {
         setIsLoading(false);
       }

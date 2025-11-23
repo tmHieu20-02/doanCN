@@ -40,60 +40,63 @@ export default function HomeScreen() {
   const { categories, isLoading: categoriesLoading, error: categoriesError } =
     useCategories();
 
-  /* ---------------------------------------------------------
-        LẤY DỊCH VỤ (USER-Không-quyền-service)
-  ----------------------------------------------------------*/
+  /* ---------------- FETCH SERVICES ---------------- */
   const [services, setServices] = useState<Service[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState('');
 
   useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        setServicesLoading(true);
+   const fetchServices = async (keyword: string = "") => {
+  try {
+    setServicesLoading(true);
 
-        const session = await SecureStore.getItemAsync("my-user-session");
-        const token = session ? JSON.parse(session).token : null;
+    const session = await SecureStore.getItemAsync("my-user-session");
+    const token = session ? JSON.parse(session).token : null;
 
-        const res = await fetch("https://phatdat.store/api/v1/service/get-all", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "*/*",
-          },
-        });
+    const url = `https://phatdat.store/api/v1/service/get-all${
+      keyword ? `?search=${encodeURIComponent(keyword)}` : ""
+    }`;
 
-        const json = await res.json();
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "*/*",
+      },
+    });
 
-        if (!json.data) {
-          setServicesError("Không thể tải dịch vụ.");
-          return;
-        }
+    const json = await res.json();
 
-        const mapped = json.data.map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          description: s.description || "",
-          image: s.image || "https://picsum.photos/400",
-          price: s.price || 0,
-          duration: `${s.duration_minutes} phút`,
-          categoryId: s.category_id,
-          rating: 4.8,
-          reviewCount: 120,
-        }));
+    if (!json.data) {
+      setServicesError("Không thể tải dịch vụ.");
+      return;
+    }
 
-        setServices(mapped);
-      } catch (e) {
-        setServicesError("Không thể tải dịch vụ.");
-      } finally {
-        setServicesLoading(false);
-      }
-    };
+    const mapped = json.data.map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description || "",
+      image: s.image || "https://picsum.photos/400",
+      price: s.price || 0,
+      duration: `${s.duration_minutes} phút`,
+      categoryId: s.category_id,
+      rating: 4.8,
+      reviewCount: 120,
+    }));
+
+    setServices(mapped);
+  } catch (e) {
+    setServicesError("Không thể tải dịch vụ.");
+  } finally {
+    setServicesLoading(false);
+  }
+};
+
 
     fetchServices();
   }, []);
 
-  /* ------------------ LẤY USER TỪ SECURESTORE ------------------ */
+  /* ---------------- LOAD USER ---------------- */
   useEffect(() => {
     const loadUserInfo = async () => {
       try {
@@ -116,7 +119,7 @@ export default function HomeScreen() {
     router.push({ pathname: '/search', params: { q: searchQuery } });
   };
 
-  /* ---------------- SERVICE CARD ---------------- */
+  /* ---------------- CARD SERVICE ---------------- */
   const renderServiceCard = ({ item }: { item: Service }) => (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -141,9 +144,7 @@ export default function HomeScreen() {
           <View style={styles.ratingContainer}>
             <Star size={14} color={colors.warning} fill={colors.warning} />
             <Text style={styles.rating}>{item.rating ?? '4.8'}</Text>
-            <Text style={styles.reviewCount}>
-              ({item.reviewCount ?? 100})
-            </Text>
+            <Text style={styles.reviewCount}>({item.reviewCount ?? 100})</Text>
           </View>
 
           <View style={styles.locationContainer}>
@@ -156,9 +157,7 @@ export default function HomeScreen() {
           <Text style={styles.price}>{item.price}đ</Text>
           <View style={styles.durationContainer}>
             <Clock size={14} color="#9CA3AF" />
-            <Text style={styles.duration}>
-              {item.duration ?? '30 phút'}
-            </Text>
+            <Text style={styles.duration}>{item.duration ?? '30 phút'}</Text>
           </View>
         </View>
       </View>
@@ -183,6 +182,82 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
+  /* =====================================================
+        🔥 LIST HEADER COMPONENT (FINAL VERSION)
+     ===================================================== */
+  const HeaderComponent = (
+    <View>
+      <LinearGradient
+        colors={[colors.primary, colors.primaryAlt]}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.greeting}>Xin chào 👋</Text>
+
+            <Text style={styles.userName}>
+              {user?.full_name ||
+                user?.fullName ||
+                user?.name ||
+                user?.numberPhone ||
+                "Khách hàng"}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={() => router.push('/(tabs)/profile')}
+          >
+            <Image
+              source={{
+                uri: user?.avatar || 'https://phatdat.store/default-avatar.png',
+              }}
+              style={styles.avatar}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Search */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Search size={20} color="#A1A1AA" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Tìm dịch vụ, spa, gym..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor="#9CA3AF"
+              onSubmitEditing={handleSearchSubmit}
+            />
+            <TouchableOpacity style={styles.filterButton}>
+              <Filter size={20} color={colors.primaryAlt} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* -------------------------------------------------
+          🌟 DỊCH VỤ NỔI BẬT (ĐƯA LÊN THAY DANH MỤC)
+      -------------------------------------------------- */}
+      <View style={[styles.section, styles.sectionHeader]}>
+        <Text style={styles.sectionTitle}>Dịch vụ nổi bật</Text>
+        <TouchableOpacity onPress={() => router.push('/search')}>
+          <Text style={styles.seeAllText}>Xem tất cả</Text>
+        </TouchableOpacity>
+      </View>
+
+      {servicesLoading && (
+        <ActivityIndicator color={colors.primaryAlt} style={{ marginTop: 30 }} />
+      )}
+
+      {servicesError && (
+        <Text style={[styles.errorText, { textAlign: 'center' }]}>
+          Không thể tải dịch vụ.
+        </Text>
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
@@ -193,122 +268,13 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         columnWrapperStyle={styles.serviceRow}
         contentContainerStyle={{ paddingBottom: 40 }}
-        ListHeaderComponent={
-          <View>
-            {/* ---------------- HEADER + GRADIENT ---------------- */}
-            <LinearGradient
-              colors={[colors.primary, colors.primaryAlt]}
-              style={styles.header}
-            >
-              <View style={styles.headerContent}>
-                <View>
-                  <Text style={styles.greeting}>Xin chào 👋</Text>
-
-                  {/* === FIX HIỂN THỊ TÊN === */}
-                  <Text style={styles.userName}>
-                    {user?.full_name ||
-                      user?.fullName ||
-                      user?.name ||
-                      user?.numberPhone ||
-                      'Khách hàng'}
-                  </Text>
-                </View>
-
-                {/* === FIX AVATAR === */}
-                <TouchableOpacity
-                  style={styles.avatarContainer}
-                  onPress={() => router.push('/(tabs)/profile')}
-                >
-                  <Image
-                    source={{
-                      uri:
-                        user?.avatar ||
-                        "https://phatdat.store/default-avatar.png",
-                    }}
-                    style={styles.avatar}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {/* ---------------- SEARCH BAR ---------------- */}
-              <View style={styles.searchContainer}>
-                <View style={styles.searchBar}>
-                  <Search size={20} color="#A1A1AA" />
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Tìm dịch vụ, spa, gym..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholderTextColor="#9CA3AF"
-                    onSubmitEditing={handleSearchSubmit}
-                  />
-                  <TouchableOpacity style={styles.filterButton}>
-                    <Filter size={20} color={colors.primaryAlt} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </LinearGradient>
-
-            {/* ---------------- CATEGORIES ---------------- */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Danh mục dịch vụ</Text>
-
-              {categoriesLoading && (
-                <ActivityIndicator
-                  color={colors.primaryAlt}
-                  style={{ marginTop: 20 }}
-                />
-              )}
-
-              {categoriesError && (
-                <Text style={styles.errorText}>
-                  {categoriesError.includes('403')
-                    ? 'Bạn chưa có quyền xem danh mục (Role User)'
-                    : 'Không thể tải danh mục.'}
-                </Text>
-              )}
-
-              {!categoriesLoading && !categoriesError && (
-                <FlatList
-                  data={categories}
-                  renderItem={renderCategoryItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.categoriesList}
-                />
-              )}
-            </View>
-
-            {/* ---------------- FEATURED ---------------- */}
-            <View style={[styles.section, styles.sectionHeader]}>
-              <Text style={styles.sectionTitle}>Dịch vụ nổi bật</Text>
-              <TouchableOpacity onPress={() => router.push('/search')}>
-                <Text style={styles.seeAllText}>Xem tất cả</Text>
-              </TouchableOpacity>
-            </View>
-
-            {servicesLoading && (
-              <ActivityIndicator
-                color={colors.primaryAlt}
-                style={{ marginTop: 30 }}
-              />
-            )}
-
-            {servicesError && (
-              <Text style={[styles.errorText, { textAlign: 'center' }]}>
-                Không thể tải dịch vụ.
-              </Text>
-            )}
-          </View>
-        }
+        ListHeaderComponent={HeaderComponent}
       />
     </SafeAreaView>
   );
 }
 
-
-/* ------------------------ STYLES (GIỮ NGUYÊN 100%) ------------------------ */
+/* ------------------------ STYLES ------------------------ */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
@@ -366,35 +332,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   seeAllText: { fontSize: 13, fontWeight: '600', color: colors.primaryDark },
 
-  categoriesList: { paddingVertical: 6 },
-  categoryItem: {
-    alignItems: 'center',
-    marginRight: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    width: 86,
-  },
-  categoryIcon: {
-    width: 46,
-    height: 46,
-    backgroundColor: colors.primaryLight,
-    borderRadius: 23,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  categoryEmoji: { fontSize: 22 },
-  categoryName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text,
-    textAlign: 'center',
-  },
-
   serviceRow: {
     justifyContent: 'space-between',
     marginBottom: 14,
@@ -440,4 +377,39 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 13,
   },
+  /* ================= CATEGORY STYLES ================= */
+
+categoryItem: {
+  alignItems: "center",
+  marginRight: 12,
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  backgroundColor: colors.card,
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: colors.border,
+  width: 86,
+},
+
+categoryIcon: {
+  width: 46,
+  height: 46,
+  backgroundColor: colors.primaryLight,
+  borderRadius: 23,
+  justifyContent: "center",
+  alignItems: "center",
+  marginBottom: 6,
+},
+
+categoryEmoji: {
+  fontSize: 22,
+},
+
+categoryName: {
+  fontSize: 12,
+  fontWeight: "600",
+  color: colors.text,
+  textAlign: "center",
+},
+
 });
