@@ -19,6 +19,9 @@ export default function StaffBooking() {
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<BookingStatus>("");
 
+  // ==========================
+  // 🔹 GET ALL BOOKINGS
+  // ==========================
   const fetchBookings = async (opts?: { silent?: boolean }) => {
     try {
       if (!opts?.silent) setLoading(true);
@@ -37,11 +40,9 @@ export default function StaffBooking() {
         }
       );
 
-      console.log("📌 STAFF BOOKING RAW:", res.data);
-
       const list =
-        res.data?.data ||
         res.data?.bookings ||
+        res.data?.data ||
         res.data?.items ||
         [];
 
@@ -63,6 +64,38 @@ export default function StaffBooking() {
     fetchBookings({ silent: true });
   };
 
+  // ==========================
+  // 🔹 CONFIRM BOOKING
+  // ==========================
+  const confirmBooking = async (booking: any) => {
+    try {
+      const stored = await SecureStore.getItemAsync("my-user-session");
+      const token = JSON.parse(stored!).token;
+
+     const body = {
+  service_id: booking.service_id,
+  booking_date: booking.booking_date,
+  start_time: booking.start_time?.slice(0, 5),  // 🔥 FIX CHÍNH
+  end_time: booking.end_time?.slice(0, 5),      // 🔥 FIX CHÍNH
+  note: booking.note || "",
+  status: "confirmed",
+};
+
+      const res = await axios.put(
+        `https://phatdat.store/api/v1/booking/update/${booking.id}`,
+        body,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log("🔍 API UPDATE RESPONSE:", res.data);
+      fetchBookings({ silent: true });
+    } catch (error: any) {
+      console.log("❌ Lỗi xác nhận:", error?.response?.data || error);
+    }
+  };
+
+  // ==========================
+  // 🔹 UI HELPERS
+  // ==========================
   const renderStatusBadge = (status: string) => {
     let bg = "#6B7280";
     let label = status;
@@ -94,47 +127,61 @@ export default function StaffBooking() {
   };
 
   const formatDateTime = (item: any) => {
-    const date = item.booking_date;
-    const time = item.start_time;
-
+    const date = item.booking_date?.slice(0, 10) || "";
+    const time = item.start_time || "";
     if (!date || !time) return "Không rõ thời gian";
-
     return `${time} • ${date}`;
   };
 
-  const renderItem = ({ item }: any) => {
-    // ✔ Lấy đúng service name
-    const serviceName =
-      item.service?.name || item.service_name || "Dịch vụ";
+  // ==========================
+  // 🔹 RENDER ITEM – UI PREMIUM
+  // ==========================
+ const renderItem = ({ item }: any) => {
+  const serviceName =
+    item.service?.name || item.service_name || "Dịch vụ";
 
-    // ✔ Lấy đúng customer
-    const customerName =
-      item.customer?.name ||
-      item.user?.fullName ||
-      item.user_name ||
-      "Ẩn danh";
+  const customerName =
+    item.customer?.full_name ||
+    item.user_name ||
+    "Ẩn danh";
 
-    // ✔ ĐÚNG GIÁ: luôn lấy từ service.price trước
-    const price =
-      item.service?.price ||
-      item.total_price ||
-      0;
+  const price =
+    item.service?.price ||
+    item.total_price ||
+    0;
 
-    const status = item.status || "pending";
+  const status = item.status || "pending";
 
-    return (
-      <View style={styles.card}>
-        <Text style={styles.service}>{serviceName}</Text>
-        <Text style={styles.customer}>Khách: {customerName}</Text>
-        <Text style={styles.customer}>Giá: {price.toLocaleString()}đ</Text>
+  return (
+    <View style={styles.card}>
 
-        <View style={styles.rowBetween}>
-          <Text style={styles.time}>{formatDateTime(item)}</Text>
-          {renderStatusBadge(status)}
-        </View>
+      {/* 🔹  Badge ở góc phải trên  */}
+      <View style={{ position: "absolute", top: 10, right: 10 }}>
+        {renderStatusBadge(status)}
       </View>
-    );
-  };
+
+      {/* Nội dung chính */}
+      <Text style={styles.service}>{serviceName}</Text>
+      <Text style={styles.customer}>Khách: {customerName}</Text>
+      <Text style={styles.customer}>Giá: {price.toLocaleString()}đ</Text>
+
+      {/* 🔹 Xác nhận ở góc dưới bên phải */}
+      {status === "pending" && (
+        <TouchableOpacity
+          onPress={() => confirmBooking(item)}
+          style={styles.confirmBtnFixed}
+        >
+          <Text style={styles.confirmText}>Xác nhận</Text>
+          
+
+        </TouchableOpacity>
+      )}
+
+      {/* Thời gian bên trái dưới */}
+      <Text style={styles.time}>{formatDateTime(item)}</Text>
+    </View>
+  );
+};
 
   const renderFilterButton = (label: string, value: BookingStatus) => {
     const active = statusFilter === value;
@@ -195,15 +242,17 @@ export default function StaffBooking() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F3F4F6", padding: 16 },
+
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
+
   title: { fontSize: 24, fontWeight: "700", color: "#111827" },
   sub: { fontSize: 14, color: "#6B7280", marginTop: 4, marginBottom: 10 },
 
   filterRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 8 },
   filterBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 30,
     borderWidth: 1,
     borderColor: "#D1D5DB",
     marginRight: 8,
@@ -217,27 +266,53 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
     padding: 16,
     borderRadius: 14,
-    marginBottom: 10,
+    marginBottom: 12,
     shadowColor: "#000",
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.05,
     shadowRadius: 6,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  service: { fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 4 },
-  customer: { fontSize: 14, color: "#374151", marginBottom: 6 },
-  time: { fontSize: 13, color: "#6B7280" },
 
-  rowBetween: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 4,
+  service: { fontSize: 17, fontWeight: "700", color: "#111827" },
+  customer: { fontSize: 14, color: "#374151", marginTop: 4 },
+
+  time: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginTop: 8,
   },
 
-  badge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999 },
+  badge: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginRight: 6,
+  },
   badgeText: { color: "#FFF", fontSize: 11, fontWeight: "600" },
+
+  confirmBtn: {
+    backgroundColor: "#2563EB",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  confirmText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
 
   emptyBox: { alignItems: "center", marginTop: 60 },
   emptyText: { color: "#6B7280", fontSize: 15 },
+  confirmBtnFixed: {
+  position: "absolute",
+  bottom: 10,
+  right: 10,
+  backgroundColor: "#2563EB",
+  paddingVertical: 6,
+  paddingHorizontal: 12,
+  borderRadius: 8,
+},
+
 });

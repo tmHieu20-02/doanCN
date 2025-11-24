@@ -22,7 +22,7 @@ import {
 } from "lucide-react-native";
 import * as SecureStore from "expo-secure-store";
 
-// ★ IMPORT THEME
+// THEME
 import { colors, radius, shadow, spacing } from "@/ui/theme";
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -50,6 +50,7 @@ export default function ServiceDetailScreen() {
       if (found) {
         setService({
           ...found,
+          price: Number(found.price),
           image_list: [
             found.image || "https://picsum.photos/400",
             found.image || "https://picsum.photos/400?2",
@@ -125,7 +126,7 @@ export default function ServiceDetailScreen() {
           ))}
         </ScrollView>
 
-        {/* Info */}
+        {/* Basic Info */}
         <View style={styles.basicInfo}>
           <Text style={styles.serviceName}>{service.name}</Text>
           <Text style={styles.serviceCategory}>Danh mục #{service.category_id}</Text>
@@ -149,9 +150,11 @@ export default function ServiceDetailScreen() {
           </View>
         </View>
 
-        {/* Price */}
+        {/* Price Section */}
         <View style={styles.priceSection}>
-          <Text style={styles.currentPrice}>{service.price}đ</Text>
+          <Text style={styles.currentPrice}>
+            {Number(service.price).toLocaleString("vi-VN")}đ
+          </Text>
           <Text style={styles.priceNote}>Giá đã bao gồm VAT</Text>
         </View>
 
@@ -176,7 +179,7 @@ export default function ServiceDetailScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Bottom Button (VÀNG CHỢ TỐT) */}
+      {/* Bottom Button */}
       <View style={styles.bottomAction}>
         <TouchableOpacity
           style={styles.bookButton}
@@ -252,25 +255,24 @@ const styles = StyleSheet.create({
   },
 
   detailItem: { flexDirection: "row", alignItems: "center" },
-
   detailText: { marginLeft: 4, color: colors.textMuted },
 
   priceSection: {
     padding: spacing(5),
     backgroundColor: colors.card,
+    marginTop: 10,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
   },
 
   currentPrice: {
     fontSize: 28,
     fontWeight: "800",
     color: colors.primaryAlt,
+    marginBottom: 4,
   },
 
-  priceNote: {
-    marginTop: 4,
-    color: colors.textMuted,
-    fontSize: 12,
-  },
+  priceNote: { color: colors.textMuted, fontSize: 12 },
 
   section: {
     padding: spacing(5),

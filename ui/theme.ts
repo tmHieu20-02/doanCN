@@ -1,14 +1,16 @@
-// ui/theme.ts
+// =======================
+// 🎨 PREMIUM SOFT-GOLD THEME
+// =======================
 
 export const colors = {
-  // Vàng chủ đạo kiểu Chợ Tốt
-  primary: '#FFCC00',      // màu chính (button, icon active, tabbar)
-  primaryDark: '#F4B000',  // đậm hơn chút, dùng cho gradient hoặc border
-  primaryLight: '#FFF3C4', // nền vàng nhạt (filter, badge…)
-  primaryAlt: '#FFA000',   // vàng cam, dùng cho text nổi bật, gradient 2
+  // 🎨 Vàng Soft-Gold premium
+  primary: '#F7C948',      // vàng dịu – dùng cho header
+  primaryDark: '#E8A200',  // vàng đậm – dùng cho button
+  primaryLight: '#FAEAB1', // vàng pastel nhẹ – dùng cho nền badge/filter
+  primaryAlt: '#F4D06F',   // vàng amber ấm – điểm nhấn
 
   // Nền & card
-  bg: '#FFFDF5',           // nền tổng thể app
+  bg: '#FFFDF7',           // nền cream sang trọng
   card: '#FFFFFF',         // nền card trắng
 
   // Text
@@ -33,14 +35,14 @@ export const radius = {
   xl: 24,
 } as const;
 
-// Shadow dùng chung cho card
+// Shadow card
 export const shadow = {
   card: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
 } as const;
 

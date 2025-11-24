@@ -130,7 +130,10 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.priceContainer}>
-          <Text style={styles.price}>{item.price}đ</Text>
+          <Text style={styles.price}>
+  {Number(String(item.price).replace(/\D/g, "")).toLocaleString("vi-VN")}đ
+</Text>
+
           <View style={styles.durationContainer}>
             <Clock size={14} color="#9CA3AF" />
             <Text style={styles.duration}>{item.duration}</Text>
