@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  SafeAreaView,
+  ImageBackground,
 } from "react-native";
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
@@ -21,48 +23,47 @@ export default function CreateService() {
   const [duration, setDuration] = useState("");
   const [price, setPrice] = useState("");
 
-  // ============================
-  // CATEGORY STATES (TYPED)
-  // ============================
-  const [categories, setCategories] = useState<
-    { label: string; value: number }[]
-  >([]);
+  const [categories, setCategories] = useState<{ label: string; value: number }[]>([]);
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [openDropdown, setOpenDropdown] = useState(false);
 
-  // ============================
-  // LOAD CATEGORY LIST
-  // ============================
- const loadCategories = async () => {
-  try {
-    const res = await axios.get("https://phatdat.store/api/v1/category/get-all");
+  // Load categories
+  const loadCategories = async () => {
+    try {
+      const stored = await SecureStore.getItemAsync("my-user-session");
+      const token = stored ? JSON.parse(stored).token : null;
 
-    console.log("CATEGORY API:", res.data);
+      if (!token) {
+        console.log("CATEGORY ERROR: NO TOKEN");
+        return;
+      }
 
-    // 🔥 SỬA TẠI ĐÂY: BE trả về res.data.categories
-    const formatted = res.data.categories.map((c: any) => ({
-      label: c.name,
-      value: c.id,
-    }));
+      const res = await axios.get("https://phatdat.store/api/v1/category/get-all", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    setCategories(formatted);
-  } catch (error) {
-    console.log("CATEGORY ERROR:", error);
-    Alert.alert("Lỗi", "Không thể tải danh mục");
-  }
-};
+      const raw = res.data.categories ?? res.data.data ?? [];
 
+      const formatted = raw.map((c: any) => ({
+        label: c.name,
+        value: c.id,
+      }));
+
+      setCategories(formatted);
+    } catch (err: any) {
+      console.log("CATEGORY ERROR:", err.response?.data || err);
+      Alert.alert("Lỗi", "Không thể tải danh mục");
+    }
+  };
 
   useEffect(() => {
     loadCategories();
   }, []);
 
-  // ============================
-  // CREATE SERVICE
-  // ============================
+  // Create service
   const handleCreate = async () => {
     if (!name || !description || !duration || !price || !categoryId) {
-      Alert.alert("Thiếu dữ liệu", "Vui lòng nhập đầy đủ thông tin.");
+      Alert.alert("Thiếu dữ liệu", "Vui lòng nhập đầy đủ thông tin");
       return;
     }
 
@@ -92,114 +93,160 @@ export default function CreateService() {
 
       Alert.alert("Thành công", "Đã tạo dịch vụ thành công!");
       router.push("/staff/(stafftabs)/services?reload=1");
+
     } catch (err: any) {
       console.log("SERVICE ERROR:", err.response?.data);
-      Alert.alert(
-        "Lỗi",
-        err.response?.data?.message || "Không thể tạo dịch vụ."
-      );
+      Alert.alert("Lỗi", err.response?.data?.message || "Không thể tạo dịch vụ.");
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Tạo dịch vụ mới</Text>
+    <SafeAreaView style={{ flex: 1 }}>
+      <ImageBackground
+     source={require("../../../assets/images/bg-blur.png")}
 
-      {/* NAME */}
-      <Text style={styles.label}>Tên dịch vụ</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Nhập tên dịch vụ"
-        value={name}
-        onChangeText={setName}
-      />
+        style={styles.bg}
+        resizeMode="contain"
+        imageStyle={{ opacity: 0.15 }}
+      >
+        <ScrollView showsVerticalScrollIndicator={false}>
+          
+          <View style={styles.card}>
+            <Text style={styles.title}>Tạo dịch vụ mới</Text>
 
-      {/* DESCRIPTION */}
-      <Text style={styles.label}>Mô tả</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="Mô tả"
-        multiline
-        value={description}
-        onChangeText={setDescription}
-      />
+            <Text style={styles.label}>Tên dịch vụ</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập tên dịch vụ"
+              value={name}
+              onChangeText={setName}
+            />
 
-      {/* DURATION */}
-      <Text style={styles.label}>Thời gian (phút)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Ví dụ: 60"
-        keyboardType="numeric"
-        value={duration}
-        onChangeText={setDuration}
-      />
+            <Text style={styles.label}>Mô tả</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Mô tả"
+              multiline
+              value={description}
+              onChangeText={setDescription}
+            />
 
-      {/* PRICE */}
-      <Text style={styles.label}>Giá dịch vụ</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Ví dụ: 200000"
-        keyboardType="numeric"
-        value={price}
-        onChangeText={setPrice}
-      />
+            <Text style={styles.label}>Thời gian (phút)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ví dụ: 60"
+              keyboardType="numeric"
+              value={duration}
+              onChangeText={setDuration}
+            />
 
-      {/* CATEGORY DROPDOWN */}
-      <Text style={styles.label}>Danh mục</Text>
+            <Text style={styles.label}>Giá dịch vụ</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ví dụ: 200000"
+              keyboardType="numeric"
+              value={price}
+              onChangeText={setPrice}
+            />
 
-      <DropDownPicker
-        open={openDropdown}
-        value={categoryId}
-        items={categories}
-        setOpen={setOpenDropdown}
-        setValue={setCategoryId}
-        setItems={setCategories}
-        placeholder="Chọn danh mục"
-        listMode="SCROLLVIEW" // Fix error VirtualizedList
-        style={styles.dropdown}
-        dropDownContainerStyle={styles.dropdownContainer}
-      />
+            <Text style={styles.label}>Danh mục</Text>
+            <DropDownPicker
+              open={openDropdown}
+              value={categoryId}
+              items={categories}
+              setOpen={setOpenDropdown}
+              setValue={setCategoryId}
+              setItems={setCategories}
+              placeholder="Chọn danh mục"
+              listMode="SCROLLVIEW"
+              style={styles.dropdown}
+              dropDownContainerStyle={styles.dropdownContainer}
+            />
 
-      {/* SUBMIT */}
-      <TouchableOpacity style={styles.btn} onPress={handleCreate}>
-        <Text style={styles.btnText}>Tạo dịch vụ</Text>
-      </TouchableOpacity>
-    </ScrollView>
+            <TouchableOpacity style={styles.btn} onPress={handleCreate}>
+              <Text style={styles.btnText}>Tạo dịch vụ</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </ImageBackground>
+    </SafeAreaView>
   );
 }
 
-// ===========================
-// STYLES
-// ===========================
 const styles = StyleSheet.create({
-  container: { padding: 20, backgroundColor: "#FFFDF5" },
-  title: { fontSize: 26, fontWeight: "700", marginBottom: 20 },
-  label: { fontSize: 15, fontWeight: "600", marginBottom: 6 },
+  bg: {
+    flex: 1,
+    paddingHorizontal: 22,
+    paddingTop: 50,
+    backgroundColor: "#F8F8F8",
+  },
+
+  card: {
+    backgroundColor: "#FFFFFF",
+    padding: 26,
+    borderRadius: 28,
+    shadowColor: "#000",
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    marginBottom: 60,
+  },
+
+  title: {
+    fontSize: 26,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 22,
+    color: "#222",
+  },
+
+  label: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 6,
+    color: "#444",
+  },
+
   input: {
+    height: 48,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    padding: 14,
-    backgroundColor: "#fff",
+    borderColor: "#DDDDDD",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    backgroundColor: "#FAFAFA",
     marginBottom: 16,
   },
-  textArea: { height: 100, textAlignVertical: "top" },
+
+  textArea: {
+    height: 100,
+    textAlignVertical: "top",
+  },
+
   dropdown: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
+    borderColor: "#DDDDDD",
+    borderRadius: 14,
     marginBottom: 16,
+    backgroundColor: "#FAFAFA",
   },
+
   dropdownContainer: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#DDDDDD",
   },
+
   btn: {
-    backgroundColor: "#FFCC00",
-    padding: 16,
-    borderRadius: 20,
+    backgroundColor: "#FFD600",
+    paddingVertical: 14,
+    borderRadius: 16,
     alignItems: "center",
     marginTop: 10,
   },
-  btnText: { fontSize: 17, fontWeight: "700" },
+
+  btnText: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#000",
+  },
 });

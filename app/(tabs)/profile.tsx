@@ -105,34 +105,39 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleChangeAvatar = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      alert("Cần quyền truy cập thư viện ảnh.");
-      return;
-    }
+const handleChangeAvatar = async () => {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    alert("Cần quyền truy cập thư viện ảnh.");
+    return;
+  }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-    });
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.7,
+  });
 
-    if (result.canceled) return;
+  if (result.canceled) return;
 
-    const imageUri = result.assets[0].uri;
+  const imageUri = result.assets[0].uri;
 
-    setAvatarUrl(imageUri);
+  // Cập nhật UI ngay lập tức
+  setAvatarUrl(imageUri);
 
-    const stored = await SecureStore.getItemAsync("my-user-session");
-    if (stored) {
-      const session = JSON.parse(stored);
-      session.avatar = imageUri;
-      await SecureStore.setItemAsync("my-user-session", JSON.stringify(session));
-    }
+  // Lưu avatar mới vào session
+  const stored = await SecureStore.getItemAsync("my-user-session");
+  if (stored) {
+    const session = JSON.parse(stored);
+    session.avatar = imageUri;
+    await SecureStore.setItemAsync("my-user-session", JSON.stringify(session));
+  }
 
-    await uploadAvatar(imageUri);
-    alert("Cập nhật ảnh đại diện thành công!");
-  };
+  // ⚡ Thông báo ngay lập tức (không chờ upload)
+  alert("Cập nhật ảnh đại diện thành công!");
+
+  // ⚙ Upload chạy nền, không block UI
+  uploadAvatar(imageUri).catch(() => {});
+};
 
   /* ================================ RENDER ================================ */
 

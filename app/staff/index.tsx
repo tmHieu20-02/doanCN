@@ -43,9 +43,7 @@ export default function StaffHome() {
       // Nếu api.js đã set baseURL = "/api/v1" thì dùng "/booking/get-all"
       // Nếu chưa, dùng "/api/v1/booking/get-all"
       const res = await api.get("/booking/get-all");
-      
-// ⚠️ Thêm dòng này để debug JSON booking thật
-console.log("BOOKING API RESPONSE:", JSON.stringify(res.data, null, 2));
+
       // Tuỳ backend:
       //  - Nếu trả về { data: [...] } thì bookings = res.data.data
       //  - Nếu trả về [ ... ] thì bookings = res.data

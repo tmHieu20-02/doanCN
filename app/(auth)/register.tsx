@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   ScrollView,
+  ImageBackground,
 } from "react-native";
 
 import { useAuth } from "../../hooks/useAuth";
@@ -26,56 +27,32 @@ export default function RegisterScreen() {
 
   const handleSignUp = async () => {
     if (!fullName || !email || !numberPhone || !password || !confirmPassword) {
-      Toast.show({
-        type: "error",
-        text1: "Thiếu thông tin",
-        text2: "Vui lòng nhập đầy đủ tất cả các trường.",
-      });
+      Toast.show({ type: "error", text1: "Thiếu thông tin", text2: "Vui lòng nhập đầy đủ tất cả các trường." });
       return;
     }
 
     if (fullName.length < 3) {
-      Toast.show({
-        type: "error",
-        text1: "Tên không hợp lệ",
-        text2: "Tên phải có ít nhất 3 ký tự.",
-      });
+      Toast.show({ type: "error", text1: "Tên không hợp lệ", text2: "Tên phải có ít nhất 3 ký tự." });
       return;
     }
 
     if (!email.includes("@") || !email.includes(".")) {
-      Toast.show({
-        type: "error",
-        text1: "Email sai định dạng",
-        text2: "Vui lòng nhập email hợp lệ.",
-      });
+      Toast.show({ type: "error", text1: "Email sai định dạng", text2: "Vui lòng nhập email hợp lệ." });
       return;
     }
 
     if (!/^[0-9]{10}$/.test(numberPhone)) {
-      Toast.show({
-        type: "error",
-        text1: "Số điện thoại không hợp lệ",
-        text2: "Số điện thoại phải gồm đúng 10 chữ số.",
-      });
+      Toast.show({ type: "error", text1: "Số điện thoại không hợp lệ", text2: "Số điện thoại phải gồm đúng 10 chữ số." });
       return;
     }
 
     if (password.length < 6) {
-      Toast.show({
-        type: "error",
-        text1: "Mật khẩu yếu",
-        text2: "Mật khẩu phải có ít nhất 6 ký tự.",
-      });
+      Toast.show({ type: "error", text1: "Mật khẩu yếu", text2: "Mật khẩu phải có ít nhất 6 ký tự." });
       return;
     }
 
     if (password !== confirmPassword) {
-      Toast.show({
-        type: "error",
-        text1: "Xác nhận mật khẩu sai",
-        text2: "Mật khẩu xác nhận không khớp.",
-      });
+      Toast.show({ type: "error", text1: "Xác nhận mật khẩu sai", text2: "Mật khẩu xác nhận không khớp." });
       return;
     }
 
@@ -86,14 +63,11 @@ export default function RegisterScreen() {
       password: password.trim(),
     });
 
-    console.log("REGISTER RESPONSE FRONT:", response);
-
     if (response.success) {
       Toast.show({
         type: "success",
         text1: "🎉 Đăng ký thành công",
         text2: "Hãy kiểm tra email để lấy mã OTP.",
-        position: "top",
       });
 
       setTimeout(() => {
@@ -102,114 +76,161 @@ export default function RegisterScreen() {
           params: { numberPhone: numberPhone.trim() },
         });
       }, 900);
-
     } else {
       Toast.show({
         type: "error",
         text1: "Đăng ký thất bại",
         text2: response.message,
-        position: "top",
       });
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Tạo tài khoản</Text>
-        </View>
+      {/* Nền illustration */}
+      <ImageBackground
+        source={require("../../assets/images/bg-blur.png")}
+        style={styles.bg}
+        resizeMode="contain"
+        imageStyle={{ opacity: 0.15 }}
+      >
+        <ScrollView showsVerticalScrollIndicator={false}>
+          
+          {/* FORM CARD */}
+          <View style={styles.card}>
+            <Text style={styles.title}>Đăng ký tài khoản</Text>
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Họ và tên</Text>
-          <TextInput style={styles.input} value={fullName} onChangeText={setFullName} />
+            <Text style={styles.label}>Họ và tên</Text>
+            <TextInput style={styles.input} value={fullName} onChangeText={setFullName} />
 
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-          />
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+            />
 
-          <Text style={styles.label}>Số điện thoại</Text>
-          <TextInput
-            style={styles.input}
-            value={numberPhone}
-            onChangeText={setNumberPhone}
-            keyboardType="phone-pad"
-          />
+            <Text style={styles.label}>Số điện thoại</Text>
+            <TextInput
+              style={styles.input}
+              value={numberPhone}
+              onChangeText={setNumberPhone}
+              keyboardType="phone-pad"
+            />
 
-          <Text style={styles.label}>Mật khẩu</Text>
-          <TextInput
-            style={styles.input}
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+            <Text style={styles.label}>Mật khẩu</Text>
+            <TextInput
+              style={styles.input}
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
 
-          <Text style={styles.label}>Xác nhận mật khẩu</Text>
-          <TextInput
-            style={styles.input}
-            secureTextEntry
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-          />
+            <Text style={styles.label}>Xác nhận mật khẩu</Text>
+            <TextInput
+              style={styles.input}
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+            />
 
-          <TouchableOpacity
-            style={styles.signUpButton}
-            onPress={handleSignUp}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <Text style={styles.signUpButtonText}>Đăng ký</Text>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.signUpButton}
+              onPress={handleSignUp}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.signUpButtonText}>Đăng ký</Text>
+              )}
+            </TouchableOpacity>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Đã có tài khoản?</Text>
-            <Link href="/(auth)/login" asChild>
-              <TouchableOpacity>
-                <Text style={styles.linkText}>Đăng nhập</Text>
-              </TouchableOpacity>
-            </Link>
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Đã có tài khoản?</Text>
+              <Link href="/(auth)/login" asChild>
+                <TouchableOpacity>
+                  <Text style={styles.linkText}>Đăng nhập</Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
+
           </View>
-        </View>
-      </ScrollView>
+
+        </ScrollView>
+      </ImageBackground>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, backgroundColor: "#FFFDF5" },
-  header: { marginTop: 50, marginBottom: 30 },
-  title: { fontSize: 32, fontWeight: "800", color: "#2A2A2A" },
-  form: { paddingBottom: 40 },
-  label: { marginTop: 16, marginBottom: 5, fontSize: 15, color: "#6B6B6B", fontWeight: "600" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#E3D8A5",
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
+  container: { flex: 1, backgroundColor: "#F8F8F8" },
+
+  bg: { flex: 1, paddingHorizontal: 22, paddingTop: 60 },
+
+  card: {
     backgroundColor: "#FFFFFF",
-    color: "#2A2A2A",
+    padding: 26,
+    borderRadius: 28,
+    shadowColor: "#000",
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    marginBottom: 60,
   },
-  signUpButton: {
-    backgroundColor: "#FFCC00",
-    padding: 16,
-    borderRadius: 16,
-    marginTop: 20,
-  },
-  signUpButtonText: {
-    color: "#222222",
+
+  title: {
+    fontSize: 26,
+    fontWeight: "700",
     textAlign: "center",
+    marginBottom: 22,
+    color: "#222",
+  },
+
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 6,
+    color: "#444",
+  },
+
+  input: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: "#DCDCDC",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    backgroundColor: "#FAFAFA",
+    marginBottom: 14,
+  },
+
+  signUpButton: {
+    backgroundColor: "#FFD600",
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+    marginTop: 10,
+  },
+
+  signUpButtonText: {
+    color: "#000",
     fontWeight: "700",
     fontSize: 16,
   },
-  footer: { flexDirection: "row", justifyContent: "center", marginTop: 20 },
-  footerText: { marginRight: 5, color: "#6B6B6B" },
-  linkText: { color: "#FF9800", fontWeight: "700" },
+
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 22,
+  },
+
+  footerText: { color: "#666" },
+
+  linkText: {
+    marginLeft: 5,
+    color: "#FF8A00",
+    fontWeight: "700",
+  },
 });
