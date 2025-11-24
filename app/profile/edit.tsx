@@ -26,12 +26,28 @@ export default function EditProfileScreen() {
   const [gender, setGender] = useState("");
   const [phone, setPhone] = useState("");
 
+  // ⭐ avatar riêng để đồng bộ chính xác
+  const [avatar, setAvatar] = useState("https://i.ibb.co/Mff2W3V/default-avatar.png");
+
+  /* ============================================
+        LOAD USER + SYNC AVATAR TỪ SECURESTORE
+  ============================================= */
   useEffect(() => {
     if (user) {
       setFullName(user.full_name || "");
       setGender(user.gender || "");
       setPhone(user.numberPhone || "");
     }
+
+    const loadAvatar = async () => {
+      const stored = await SecureStore.getItemAsync("my-user-session");
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.avatar) setAvatar(data.avatar);
+      }
+    };
+
+    loadAvatar();
   }, [user]);
 
   /* ============================
@@ -51,12 +67,14 @@ export default function EditProfileScreen() {
       return;
     }
 
-    // Lưu lại vào SecureStore
+    // ⭐ Lưu session local
     const stored = await SecureStore.getItemAsync("my-user-session");
     if (stored) {
       const session = JSON.parse(stored);
       session.full_name = fullName;
       session.gender = gender;
+      if (session.avatar) setAvatar(session.avatar);
+
       await SecureStore.setItemAsync("my-user-session", JSON.stringify(session));
     }
 
@@ -88,9 +106,7 @@ export default function EditProfileScreen() {
         {/* AVATAR FLOATING */}
         <View style={styles.avatarWrapper}>
           <Image
-            source={{
-              uri: user?.avatar || "https://i.ibb.co/Mff2W3V/default-avatar.png",
-            }}
+            source={{ uri: avatar }}
             style={styles.avatar}
           />
         </View>
@@ -123,15 +139,41 @@ export default function EditProfileScreen() {
           </View>
 
           {/* GENDER */}
-          <View style={styles.inputGroup}>
-            <UserCircle2 size={20} color={colors.primaryDark} style={{ marginRight: 10 }} />
-            <TextInput
-              value={gender}
-              onChangeText={setGender}
-              placeholder="Giới tính (male/female)"
-              placeholderTextColor={colors.textMuted}
-              style={styles.input}
-            />
+          <View style={[styles.inputGroup, { flexDirection: "column" }]}>
+            <View style={{ flexDirection: "row", marginBottom: 6 }}>
+              <UserCircle2 size={20} color={colors.primaryDark} style={{ marginRight: 10 }} />
+              <Text style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>
+                Giới tính
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 14 }}>
+              {/* Male */}
+              <TouchableOpacity
+                onPress={() => setGender("male")}
+                style={[
+                  styles.genderOption,
+                  gender === "male" && styles.genderOptionActive
+                ]}
+              >
+                <Text style={{ color: gender === "male" ? "#000" : colors.textMuted }}>
+                  Nam
+                </Text>
+              </TouchableOpacity>
+
+              {/* Female */}
+              <TouchableOpacity
+                onPress={() => setGender("female")}
+                style={[
+                  styles.genderOption,
+                  gender === "female" && styles.genderOptionActive
+                ]}
+              >
+                <Text style={{ color: gender === "female" ? "#000" : colors.textMuted }}>
+                  Nữ
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* SAVE BUTTON */}
@@ -148,7 +190,6 @@ export default function EditProfileScreen() {
 /* ============================
           STYLES
 ============================ */
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -240,5 +281,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     marginLeft: spacing(2),
+  },
+
+  /* Gender Select */
+  genderOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "#fff",
+  },
+  genderOptionActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryDark,
   },
 });

@@ -204,7 +204,9 @@ export default function ProfileScreen() {
                     key={item.id}
                     onPress={() => {
                       if (item.id === "edit-profile") {
-                        router.push("../profile/edit");
+                       router.push("/profile/edit");
+
+
                       }
                     }}
                     style={[

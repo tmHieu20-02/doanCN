@@ -10,7 +10,7 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import { Search, SlidersHorizontal, MapPin, Clock } from "lucide-react-native";
+import { Search, SlidersHorizontal, Clock } from "lucide-react-native";
 import { Link, useLocalSearchParams } from "expo-router";
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
@@ -19,8 +19,10 @@ import { colors, radius, shadow } from "@/ui/theme";
 const API_BASE = "https://phatdat.store";
 
 export default function SearchScreen() {
-  const { category, q } =
-    useLocalSearchParams<{ category: string; q: string }>();
+  const { category, q } = useLocalSearchParams<{
+    category: string;
+    q: string;
+  }>();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [services, setServices] = useState<any[]>([]);
@@ -31,9 +33,6 @@ export default function SearchScreen() {
     else if (q) setSearchQuery(q);
   }, [category, q]);
 
-  /* ================================
-          CALL API SEARCH
-  ================================= */
   const fetchServices = async () => {
     try {
       setLoading(true);
@@ -46,15 +45,15 @@ export default function SearchScreen() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const data = res.data?.data || [];
+      const list = res.data?.data || [];
 
-      const mapped = data.map((s: any) => ({
+      const mapped = list.map((s: any) => ({
         id: s.id,
         name: s.name,
         categoryName: s.category?.name ?? "Không có danh mục",
         price: s.price,
         duration: `${s.duration_minutes} phút`,
-        image: s.image || "https://picsum.photos/300", // tránh lỗi null image
+        image: "https://picsum.photos/200", // API không có image
       }));
 
       setServices(mapped);
@@ -69,9 +68,6 @@ export default function SearchScreen() {
     fetchServices();
   }, [searchQuery]);
 
-  /* ===================================
-          RENDER ITEM (GIỐNG CHỢ TỐT)
-  ====================================*/
   const renderItem = ({ item }: any) => (
     <Link
       href={{
@@ -81,10 +77,8 @@ export default function SearchScreen() {
       asChild
     >
       <TouchableOpacity style={styles.rowCard}>
-        {/* ==== IMAGE LEFT ==== */}
         <Image source={{ uri: item.image }} style={styles.cardImage} />
 
-        {/* ==== CONTENT RIGHT ==== */}
         <View style={styles.cardBody}>
           <Text style={styles.cardTitle} numberOfLines={1}>
             {item.name}
@@ -99,7 +93,6 @@ export default function SearchScreen() {
             <Text style={styles.cardDuration}>{item.duration}</Text>
           </View>
 
-          {/* BUTTON */}
           <TouchableOpacity style={styles.cardButton}>
             <Text style={styles.cardButtonText}>Đặt lịch</Text>
           </TouchableOpacity>
@@ -110,13 +103,11 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Tìm kiếm dịch vụ</Text>
         <Text style={styles.headerSubtitle}>Lọc theo danh mục, từ khóa</Text>
       </View>
 
-      {/* SEARCH BAR */}
       <View style={styles.searchRow}>
         <View style={styles.searchInputWrapper}>
           <Search size={20} color={colors.textMuted} />
@@ -134,7 +125,6 @@ export default function SearchScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* LIST */}
       {loading ? (
         <ActivityIndicator
           size="large"
@@ -153,12 +143,8 @@ export default function SearchScreen() {
   );
 }
 
-/* =====================================
-          STYLES - CHỢ TỐT STYLE
-===================================== */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-
   header: {
     backgroundColor: colors.primary,
     paddingHorizontal: 20,
@@ -197,7 +183,6 @@ const styles = StyleSheet.create({
     borderColor: colors.primaryDark,
   },
 
-  /* === CHỢ TỐT CARD === */
   rowCard: {
     flexDirection: "row",
     backgroundColor: colors.card,
@@ -209,6 +194,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...shadow.card,
   },
+
   cardImage: {
     width: 110,
     height: 110,

@@ -9,113 +9,114 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import axios from "axios";
-import * as SecureStore from "expo-secure-store";
-import { useLocalSearchParams, useRouter } from "expo-router";
 
-export default function BookingDetail() {
+import { useLocalSearchParams, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import axios from "axios";
+
+export default function ServiceDetail() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [booking, setBooking] = useState<any>(null);
+  const [service, setService] = useState<any>(null);
 
   // =============================
-  //  Load booking theo ID
+  // LOAD SERVICE BY ID
   // =============================
-  const fetchBooking = async () => {
+  const loadService = async () => {
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const token = JSON.parse(stored!).token;
 
       const res = await axios.get(
-        "https://phatdat.store/api/v1/booking/get-all",
+        `https://phatdat.store/api/v1/service/get/${id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      const found = res.data.data.find((b: any) => b.id == id);
-
-      setBooking(found);
+      setService(res.data.data);
     } catch (err: any) {
-      console.log("Lỗi:", err?.response?.data || err);
+      console.log("Lỗi load service:", err?.response?.data);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBooking();
+    loadService();
   }, [id]);
 
   // =============================
-  //  Update booking
+  // UPDATE SERVICE
   // =============================
-  const updateBooking = async () => {
+  const updateService = async () => {
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const token = JSON.parse(stored!).token;
 
       await axios.put(
-        `https://phatdat.store/api/v1/booking/update/${id}`,
+        `https://phatdat.store/api/v1/service/update/${id}`,
         {
-          service_id: Number(booking.service_id),
-          booking_date: booking.booking_date,
-          start_time: booking.start_time,
-          end_time: booking.end_time,
-          status: booking.status,
-          note: booking.note,
+          name: service.name,
+          description: service.description,
+          duration_minutes: Number(service.duration_minutes),
+          price: Number(service.price),
+          category_id: Number(service.category_id),
+          is_active: Boolean(service.is_active),
         },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      Alert.alert("Thành công", "Cập nhật booking thành công!");
-      router.push("../../(tabs)/bookings?reload=1");
+      Alert.alert("Thành công", "Cập nhật dịch vụ thành công!");
 
+     router.push({
+  pathname: "/staff/(stafftabs)/services",
+  params: { reload: "1" },
+});
 
     } catch (err: any) {
       Alert.alert(
         "Lỗi",
-        err?.response?.data?.message || "Không thể cập nhật booking"
+        err?.response?.data?.message || "Không thể cập nhật dịch vụ"
       );
     }
   };
 
   // =============================
-  //  CANCEL booking
+  // DELETE SERVICE
   // =============================
-  const cancelBooking = () => {
-    Alert.alert("Hủy booking", "Bạn có chắc muốn hủy?", [
+  const deleteService = () => {
+    Alert.alert("Xóa dịch vụ", "Bạn có chắc muốn xóa?", [
       { text: "Không" },
       {
-        text: "Hủy",
+        text: "Xóa",
         style: "destructive",
         onPress: async () => {
           try {
             const stored = await SecureStore.getItemAsync("my-user-session");
             const token = JSON.parse(stored!).token;
 
-            await axios.patch(
-              `https://phatdat.store/api/v1/booking/cancel/${id}`,
-              {
-                cancel_note: "Staff hủy lịch",
-              },
+            await axios.delete(
+              `https://phatdat.store/api/v1/service/delete/${id}`,
               {
                 headers: { Authorization: `Bearer ${token}` },
               }
             );
 
-            Alert.alert("Đã hủy booking");
-           router.push("../../(tabs)/bookings?reload=1");
-
+            Alert.alert("Đã xóa dịch vụ");
+router.push({
+  pathname: "/staff/(stafftabs)/services",
+  params: { reload: "1" },
+});
 
           } catch (err: any) {
             Alert.alert(
               "Lỗi",
-              err?.response?.data?.message || "Không thể hủy booking"
+              err?.response?.data?.message || "Không thể xóa dịch vụ"
             );
           }
         },
@@ -123,6 +124,9 @@ export default function BookingDetail() {
     ]);
   };
 
+  // =============================
+  // LOADING UI
+  // =============================
   if (loading) {
     return (
       <View style={styles.center}>
@@ -131,72 +135,74 @@ export default function BookingDetail() {
     );
   }
 
-  if (!booking) {
+  if (!service) {
     return (
       <View style={styles.center}>
-        <Text style={{ color: "#6B7280" }}>Không tìm thấy booking</Text>
+        <Text>Không tìm thấy dịch vụ</Text>
       </View>
     );
   }
 
+  // =============================
+  // UI
+  // =============================
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Chỉnh sửa booking</Text>
+      <Text style={styles.title}>Chỉnh sửa dịch vụ</Text>
 
       <View style={styles.card}>
-        <Text style={styles.label}>ID Dịch vụ</Text>
+        <Text style={styles.label}>Tên dịch vụ</Text>
         <TextInput
           style={styles.input}
-          value={String(booking.service_id)}
-          onChangeText={(t) =>
-            setBooking({ ...booking, service_id: Number(t) })
-          }
-          keyboardType="numeric"
+          value={service.name}
+          onChangeText={(t) => setService({ ...service, name: t })}
         />
 
-        <Text style={styles.label}>Ngày booking</Text>
+        <Text style={styles.label}>Mô tả</Text>
         <TextInput
-          style={styles.input}
-          value={booking.booking_date}
-          onChangeText={(t) => setBooking({ ...booking, booking_date: t })}
-        />
-
-        <Text style={styles.label}>Giờ bắt đầu</Text>
-        <TextInput
-          style={styles.input}
-          value={booking.start_time}
-          onChangeText={(t) => setBooking({ ...booking, start_time: t })}
-        />
-
-        <Text style={styles.label}>Giờ kết thúc</Text>
-        <TextInput
-          style={styles.input}
-          value={booking.end_time}
-          onChangeText={(t) => setBooking({ ...booking, end_time: t })}
-        />
-
-        <Text style={styles.label}>Trạng thái</Text>
-        <TextInput
-          style={styles.input}
-          value={booking.status}
-          onChangeText={(t) => setBooking({ ...booking, status: t })}
-        />
-
-        <Text style={styles.label}>Ghi chú</Text>
-        <TextInput
-          style={[styles.input, { height: 80 }]}
+          style={[styles.input, { height: 100 }]}
           multiline
-          value={booking.note || ""}
-          onChangeText={(t) => setBooking({ ...booking, note: t })}
+          value={service.description}
+          onChangeText={(t) => setService({ ...service, description: t })}
+        />
+
+        <Text style={styles.label}>Thời gian (phút)</Text>
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          value={String(service.duration_minutes)}
+          onChangeText={(t) =>
+            setService({ ...service, duration_minutes: Number(t) })
+          }
+        />
+
+        <Text style={styles.label}>Giá dịch vụ</Text>
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          value={String(service.price)}
+          onChangeText={(t) =>
+            setService({ ...service, price: Number(t) })
+          }
+        />
+
+        <Text style={styles.label}>ID danh mục</Text>
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          value={String(service.category_id)}
+          onChangeText={(t) =>
+            setService({ ...service, category_id: Number(t) })
+          }
         />
       </View>
 
-      <TouchableOpacity style={styles.saveBtn} onPress={updateBooking}>
-        <Text style={styles.saveText}>Cập nhật</Text>
+      <TouchableOpacity style={styles.saveBtn} onPress={updateService}>
+        <Text style={styles.saveText}>Lưu</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.deleteBtn} onPress={cancelBooking}>
-        <Text style={styles.deleteText}>Hủy booking</Text>
+      <TouchableOpacity style={styles.deleteBtn} onPress={deleteService}>
+        <Text style={styles.deleteText}>Xóa dịch vụ</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -204,11 +210,8 @@ export default function BookingDetail() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#F3F4F6" },
-
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-
   title: { fontSize: 24, fontWeight: "700", marginBottom: 16 },
-
   card: {
     backgroundColor: "#fff",
     padding: 18,
@@ -217,14 +220,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 6,
-    color: "#374151",
-  },
-
+  label: { fontSize: 14, fontWeight: "600", marginBottom: 6 },
   input: {
     backgroundColor: "#F9FAFB",
     padding: 12,
@@ -233,7 +229,6 @@ const styles = StyleSheet.create({
     borderColor: "#D1D5DB",
     marginBottom: 14,
   },
-
   saveBtn: {
     backgroundColor: "#2563EB",
     paddingVertical: 15,
@@ -242,7 +237,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   saveText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-
   deleteBtn: {
     backgroundColor: "#DC2626",
     paddingVertical: 15,

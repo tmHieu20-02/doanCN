@@ -26,25 +26,28 @@ export default function StaffBooking() {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const token = JSON.parse(stored!).token;
 
-      const params: any = {
-        page: 1,
-        limit: 20,
-      };
+      const params: any = { page: 1, limit: 20 };
       if (statusFilter) params.status = statusFilter;
 
       const res = await axios.get(
         "https://phatdat.store/api/v1/booking/get-all",
         {
           params,
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      setBookings(res.data?.data || []);
+      console.log("📌 STAFF BOOKING RAW:", res.data);
+
+      const list =
+        res.data?.data ||
+        res.data?.bookings ||
+        res.data?.items ||
+        [];
+
+      setBookings(list);
     } catch (err: any) {
-      console.log("Lỗi lấy booking:", err?.response?.data || err);
+      console.log("❌ Lỗi lấy booking:", err?.response?.data || err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -53,7 +56,6 @@ export default function StaffBooking() {
 
   useEffect(() => {
     fetchBookings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   const onRefresh = () => {
@@ -92,38 +94,39 @@ export default function StaffBooking() {
   };
 
   const formatDateTime = (item: any) => {
-    const raw =
-      item.booking_time ||
-      item.dateTime ||
-      item.time ||
-      item.date ||
-      item.created_at;
+    const date = item.booking_date;
+    const time = item.start_time;
 
-    if (!raw) return "Không rõ thời gian";
+    if (!date || !time) return "Không rõ thời gian";
 
-    const d = new Date(raw);
-    if (isNaN(d.getTime())) return String(raw);
-
-    return d.toLocaleString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return `${time} • ${date}`;
   };
 
   const renderItem = ({ item }: any) => {
+    // ✔ Lấy đúng service name
     const serviceName =
-      item.service?.name || item.service_name || "Dịch vụ không rõ";
+      item.service?.name || item.service_name || "Dịch vụ";
+
+    // ✔ Lấy đúng customer
     const customerName =
-      item.customer?.name || item.user?.fullName || item.user_name || "Ẩn danh";
+      item.customer?.name ||
+      item.user?.fullName ||
+      item.user_name ||
+      "Ẩn danh";
+
+    // ✔ ĐÚNG GIÁ: luôn lấy từ service.price trước
+    const price =
+      item.service?.price ||
+      item.total_price ||
+      0;
+
     const status = item.status || "pending";
 
     return (
       <View style={styles.card}>
         <Text style={styles.service}>{serviceName}</Text>
         <Text style={styles.customer}>Khách: {customerName}</Text>
+        <Text style={styles.customer}>Giá: {price.toLocaleString()}đ</Text>
 
         <View style={styles.rowBetween}>
           <Text style={styles.time}>{formatDateTime(item)}</Text>
@@ -135,13 +138,11 @@ export default function StaffBooking() {
 
   const renderFilterButton = (label: string, value: BookingStatus) => {
     const active = statusFilter === value;
+
     return (
       <TouchableOpacity
         onPress={() => setStatusFilter(value)}
-        style={[
-          styles.filterBtn,
-          active && styles.filterBtnActive,
-        ]}
+        style={[styles.filterBtn, active && styles.filterBtnActive]}
       >
         <Text style={[styles.filterText, active && styles.filterTextActive]}>
           {label}
@@ -164,11 +165,8 @@ export default function StaffBooking() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Lịch hẹn của bạn</Text>
-      <Text style={styles.sub}>
-        Xem và quản lý các lịch hẹn được giao cho bạn
-      </Text>
+      <Text style={styles.sub}>Xem và quản lý các lịch hẹn được giao cho bạn</Text>
 
-      {/* Bộ lọc trạng thái */}
       <View style={styles.filterRow}>
         {renderFilterButton("Tất cả", "")}
         {renderFilterButton("Chờ", "pending")}
@@ -196,36 +194,12 @@ export default function StaffBooking() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F3F4F6",
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: "#F3F4F6", padding: 16 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  title: { fontSize: 24, fontWeight: "700", color: "#111827" },
+  sub: { fontSize: 14, color: "#6B7280", marginTop: 4, marginBottom: 10 },
 
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F3F4F6",
-  },
-
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  sub: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginTop: 4,
-    marginBottom: 10,
-  },
-
-  filterRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 8,
-  },
+  filterRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 8 },
   filterBtn: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -235,47 +209,24 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-  filterBtnActive: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
-  },
-  filterText: {
-    fontSize: 12,
-    color: "#4B5563",
-    fontWeight: "500",
-  },
-  filterTextActive: {
-    color: "#FFFFFF",
-  },
+  filterBtnActive: { backgroundColor: "#2563EB", borderColor: "#2563EB" },
+  filterText: { fontSize: 12, color: "#4B5563", fontWeight: "500" },
+  filterTextActive: { color: "#FFF" },
 
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#FFF",
     padding: 16,
     borderRadius: 14,
     marginBottom: 10,
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 6,
-    elevation: 2,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-
-  service: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 4,
-  },
-  customer: {
-    fontSize: 14,
-    color: "#374151",
-    marginBottom: 6,
-  },
-  time: {
-    fontSize: 13,
-    color: "#6B7280",
-  },
+  service: { fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 4 },
+  customer: { fontSize: 14, color: "#374151", marginBottom: 6 },
+  time: { fontSize: 13, color: "#6B7280" },
 
   rowBetween: {
     flexDirection: "row",
@@ -284,23 +235,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  badge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "600",
-  },
+  badge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999 },
+  badgeText: { color: "#FFF", fontSize: 11, fontWeight: "600" },
 
-  emptyBox: {
-    alignItems: "center",
-    marginTop: 60,
-  },
-  emptyText: {
-    color: "#6B7280",
-    fontSize: 15,
-  },
+  emptyBox: { alignItems: "center", marginTop: 60 },
+  emptyText: { color: "#6B7280", fontSize: 15 },
 });

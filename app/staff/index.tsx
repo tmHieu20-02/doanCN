@@ -44,23 +44,33 @@ export default function StaffHome() {
       {/* MENU CHÍNH */}
       <Text style={styles.sectionTitle}>Chức năng</Text>
 
-   <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/staff/(tabs)/bookings")}>
+  <TouchableOpacity
+  style={styles.menuItem}
+  onPress={() => router.push("/staff/(stafftabs)/bookings")}
+>
   <Calendar color="#444" size={22} />
   <Text style={styles.menuLabel}>Quản lý lịch hẹn</Text>
   <ChevronRight color="#999" />
 </TouchableOpacity>
 
-<TouchableOpacity style={styles.menuItem} onPress={() => router.push("/staff/(tabs)/services")}>
+<TouchableOpacity
+  style={styles.menuItem}
+  onPress={() => router.push("/staff/(stafftabs)/services")}
+>
   <List color="#444" size={22} />
   <Text style={styles.menuLabel}>Dịch vụ</Text>
   <ChevronRight color="#999" />
 </TouchableOpacity>
 
-<TouchableOpacity style={styles.menuItem} onPress={() => router.push("/staff/(tabs)/profile")}>
+<TouchableOpacity
+  style={styles.menuItem}
+  onPress={() => router.push("/staff/(stafftabs)/profile")}
+>
   <User color="#444" size={22} />
   <Text style={styles.menuLabel}>Hồ sơ nhân viên</Text>
   <ChevronRight color="#999" />
 </TouchableOpacity>
+
 
 
     </ScrollView>

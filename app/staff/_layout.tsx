@@ -4,12 +4,19 @@ import { useAuth } from "../../hooks/useAuth";
 export default function StaffLayout() {
   const { user } = useAuth();
 
-  // Nếu chưa login hoặc không phải staff → đẩy về UI user
-  if (!user || user.roleId !== 2) {
-    return <Redirect href="/staff/(tabs)" />;
+  console.log("STAFF USER:", user);
 
+  // ❌ Nếu chưa login → về login
+  if (!user) {
+    return <Redirect href="/(auth)/login" />;
   }
 
+  // ❌ Nếu là user role 3 → ép về UI user
+  if (user.roleId !== 2) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  // ✔ Staff hợp lệ → render UI staff
   return (
     <Stack
       screenOptions={{

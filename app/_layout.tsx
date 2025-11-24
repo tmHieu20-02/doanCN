@@ -12,45 +12,45 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
 
+  // ❗ SAFETY: segments[0] luôn tồn tại
+  const root = segments?.[0] ?? null;
+
   useEffect(() => {
     if (!isInitialized) return;
 
-    const inAuthGroup = segments[0] === "(auth)";
+    const inAuthGroup = root === "(auth)";
 
-    // ===========================
-    // 1. Chưa đăng nhập → ép vào Login
-    // ===========================
+    // 1. Chưa đăng nhập → ép login
     if (!user && !inAuthGroup) {
       router.replace("/(auth)/login");
       return;
     }
 
-    // ===========================
-    // 2. Đã đăng nhập mà còn ở nhóm (auth)
-    //    → Chuyển theo role
-    // ===========================
+    // 2. Đã đăng nhập nhưng đang ở (auth) → đẩy theo role
     if (user && inAuthGroup) {
       if (user.roleId === 2) {
-        router.replace("/staff");      // UI STAFF
+        router.replace("/staff");
       } else if (user.roleId === 3) {
-        router.replace("/(tabs)");     // UI USER
+        router.replace("/(tabs)");
       }
       return;
     }
 
-    // ===========================
-    // 3. Người dùng đã đăng nhập
-    //    Nếu họ ở sai UI → ép đúng role
-    // ===========================
+    // 3. Đăng nhập rồi → ép về đúng root nhưng KHÔNG chặn route con
     if (user) {
-      if (user.roleId === 2 && segments[0] !== "staff") {
+      // STAFF (roleId 2)
+      if (user.roleId === 2 && root !== "staff") {
         router.replace("/staff");
+        return;
       }
-      if (user.roleId === 3 && segments[0] !== "(tabs)") {
+
+      // USER (roleId 3)
+      if (user.roleId === 3 && root === "staff") {
         router.replace("/(tabs)");
+        return;
       }
     }
-  }, [user, isInitialized, segments]);
+  }, [user, isInitialized, root]);
 
   if (!isInitialized) {
     return (
