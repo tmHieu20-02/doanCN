@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,330 +9,483 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   StatusBar,
-} from 'react-native';
+  Image,
+} from "react-native";
 
-import { useAuth } from '@/hooks/useAuth'; // Kiểm tra lại đường dẫn import này nếu cần
-import { Link, useRouter } from 'expo-router';
-import { MotiView, MotiImage } from 'moti';
-import { MaterialCommunityIcons, AntDesign } from '@expo/vector-icons';
+import { useAuth } from "@/hooks/useAuth";
+import api from "@/utils/api";
+import Toast from "react-native-toast-message";
+
+import { Link, useRouter } from "expo-router";
+import { AntDesign, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { MotiView, AnimatePresence } from "moti";
+import { AxiosError } from "axios";
 
 export default function LoginScreen() {
   const router = useRouter();
-  
-  // ✅ FIX 1: Chỉ lấy hàm signIn, tự tạo state loading riêng
-  const { signIn } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
+  const { signIn, signUp, isLoading } = useAuth();
 
-  const [numberPhone, setNumberPhone] = useState('');
-  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState("login"); // login | forgot | register
 
-  /* ===============================================================
-                     LOGIN HANDLE (FINAL)
-  ================================================================ */
+  /* LOGIN STATES */
+  const [numberPhone, setNumberPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  /* FORGOT */
+  const [fpPhone, setFpPhone] = useState("");
+  const [fpLoading, setFpLoading] = useState(false);
+
+  /* REGISTER */
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [rgPhone, setRgPhone] = useState("");
+  const [rgPassword, setRgPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  /* ============================= LOGIN ============================= */
   const handleSignIn = async () => {
     if (!numberPhone || !password) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin.');
+      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin.");
       return;
     }
 
-    // Validate số điện thoại
     if (!/^[0-9]{10}$/.test(numberPhone)) {
-      Alert.alert('Lỗi', 'Số điện thoại phải gồm đúng 10 số.');
+      Alert.alert("Lỗi", "Số điện thoại phải gồm đúng 10 số.");
       return;
     }
 
-    // Validate mật khẩu đơn giản
     if (password.length < 6) {
-        Alert.alert('Lỗi', 'Mật khẩu quá ngắn.');
-        return;
+      Alert.alert("Lỗi", "Mật khẩu quá ngắn.");
+      return;
     }
 
-    // Bắt đầu loading
-    setIsLoading(true);
+    setLoginLoading(true);
 
     try {
-        // GỌI API LOGIN
-        const result = await signIn({
-            numberPhone: numberPhone.trim(),
-            password: password.trim(),
-        });
+      const result = await signIn({
+        numberPhone: numberPhone.trim(),
+        password: password.trim(),
+      });
 
-        if (result.success) {
-            console.log("✅ Đăng nhập thành công! Đợi _layout chuyển trang...");
-            
-            // ✅ FIX 2: KHÔNG gọi router.replace ở đây.
-            // Lý do: File _layout.tsx sẽ tự phát hiện User mới và chuyển vào Tabs.
-            // Nếu gọi ở đây sẽ bị xung đột (Race Condition).
-        } else {
-            Alert.alert("Đăng nhập thất bại", result.message || "Kiểm tra lại thông tin.");
-        }
-    } catch (error) {
-        Alert.alert("Lỗi", "Có lỗi hệ thống xảy ra.");
+      if (!result.success) {
+        Alert.alert("Đăng nhập thất bại", result.message || "Kiểm tra lại thông tin.");
+      }
+    } catch {
+      Alert.alert("Lỗi", "Có lỗi hệ thống xảy ra.");
     } finally {
-        // Tắt loading dù thành công hay thất bại
-        setIsLoading(false);
+      setLoginLoading(false);
     }
   };
 
+  /* ============================= FORGOT PASSWORD ============================= */
+  const handleSendOtp = async () => {
+    if (!/^[0-9]{10}$/.test(fpPhone.trim())) {
+      Alert.alert("Lỗi", "Số điện thoại phải gồm đúng 10 số.");
+      return;
+    }
+
+    setFpLoading(true);
+
+    try {
+      const res = await api.post("/auth/forgot-password", {
+        numberPhone: fpPhone.trim(),
+      });
+
+      if (res.data.err === 0) {
+        router.push({
+          pathname: "/verify-reset-otp",
+          params: {
+            token: res.data.reset_token,
+            numberPhone: fpPhone.trim(),
+          },
+        });
+      } else {
+        Alert.alert("Lỗi", res.data.mes);
+      }
+    } catch (e) {
+  const err = e as AxiosError;
+  console.log("FORGOT ERROR:", err.response?.data || err);
+  Alert.alert("Lỗi", "Không thể gửi OTP.");
+} finally {
+      setFpLoading(false);
+    }
+  };
+
+  /* ============================= REGISTER (GIỮ NGUYÊN) ============================= */
+  const handleSignUp = async () => {
+    if (!fullName || !email || !rgPhone || !rgPassword || !confirmPassword) {
+      Toast.show({ type: "error", text1: "Thiếu thông tin", text2: "Vui lòng nhập tất cả trường." });
+      return;
+    }
+
+    if (fullName.length < 3) {
+      Toast.show({ type: "error", text1: "Tên không hợp lệ" });
+      return;
+    }
+
+    if (!email.includes("@") || !email.includes(".")) {
+      Toast.show({ type: "error", text1: "Email sai định dạng" });
+      return;
+    }
+
+    if (!/^[0-9]{10}$/.test(rgPhone)) {
+      Toast.show({ type: "error", text1: "SĐT phải 10 số" });
+      return;
+    }
+
+    if (rgPassword.length < 6) {
+      Toast.show({ type: "error", text1: "Mật khẩu quá yếu" });
+      return;
+    }
+
+    if (rgPassword !== confirmPassword) {
+      Toast.show({ type: "error", text1: "Mật khẩu không khớp" });
+      return;
+    }
+
+    const response = await signUp({
+      full_name: fullName.trim(),
+      email: email.trim(),
+      numberPhone: rgPhone.trim(),
+      password: rgPassword.trim(),
+    });
+
+    if (response.success) {
+      Toast.show({
+        type: "success",
+        text1: "Đăng ký thành công",
+        text2: "Hãy kiểm tra email lấy OTP",
+      });
+
+      router.push({
+        pathname: "/(auth)/verify-otp",
+        params: { numberPhone: rgPhone.trim() },
+      });
+    } else {
+      Toast.show({ type: "error", text1: "Đăng ký thất bại", text2: response.message });
+    }
+  };
+
+  /* ============================= RENDER ============================= */
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <LinearGradient colors={["#FFE9A3", "#FFE29B", "#FFD98A"]} style={styles.header}>
+          <Text style={styles.headerTitle}>
+            {mode === "login" && "Đăng nhập để tiếp tục"}
+            {mode === "forgot" && "Quên mật khẩu"}
+            {mode === "register" && "Tạo tài khoản mới"}
+          </Text>
 
-          {/* HERO IMAGE */}
-          <MotiView
-            style={styles.heroWrapper}
-            from={{ opacity: 0, translateY: -40 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: 'timing', duration: 600 }}
-          >
-            {/* Lưu ý: Đảm bảo đường dẫn ảnh đúng */}
-            <MotiImage
-              source={require('../../assets/images/Login-rafiki.png')} 
-              style={styles.heroImage}
-              from={{ scale: 1.05 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'timing', duration: 800 }}
-            />
-          </MotiView>
+          <Image
+            source={require("../../assets/images/Login-rafiki.png")}
+            style={styles.headerImage}
+            resizeMode="contain"
+          />
+        </LinearGradient>
 
-          {/* TITLE */}
-          <MotiView
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ delay: 100, duration: 500 }}
-            style={styles.titleWrapper}
-          >
-            <Text style={styles.title}>Chào mừng trở lại!</Text>
-            <Text style={styles.subtitle}>Đăng nhập để tiếp tục</Text>
-          </MotiView>
+        {/* ================== CONTENT ================== */}
+        <View style={styles.formArea}>
+          <AnimatePresence>
 
-          {/* FORM */}
-          <MotiView
-            style={styles.card}
-            from={{ opacity: 0, translateY: 40 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: 'timing', duration: 550, delay: 150 }}
-          >
-            {/* PHONE */}
-            <View style={styles.inputWrapper}>
-              <MaterialCommunityIcons name="phone-outline" size={22} color="#A88800" />
-              <TextInput
-                style={styles.input}
-                placeholder="Số điện thoại"
-                placeholderTextColor="#9C8C4A"
-                keyboardType="phone-pad"
-                value={numberPhone}
-                onChangeText={setNumberPhone}
-              />
-            </View>
-
-            {/* PASSWORD */}
-            <View style={styles.inputWrapper}>
-              <MaterialCommunityIcons name="lock-outline" size={22} color="#A88800" />
-              <TextInput
-                style={styles.input}
-                placeholder="Mật khẩu"
-                placeholderTextColor="#9C8C4A"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-            </View>
-
-       <TouchableOpacity
-  style={styles.forgotButton}
- onPress={() => router.push("/forgot-password")}
-
->
-  <Text style={styles.forgotText}>Quên mật khẩu?</Text>
-</TouchableOpacity>
-
-
-            {/* LOGIN BUTTON */}
-            <MotiView
-              from={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', damping: 14, stiffness: 180, delay: 220 }}
-            >
-              <TouchableOpacity
-                style={[styles.loginButton, isLoading && { opacity: 0.7 }]}
-                onPress={handleSignIn}
-                disabled={isLoading}
+            {/* ================= LOGIN FORM ================= */}
+            {mode === "login" && (
+              <MotiView
+                key="loginForm"
+                from={{ opacity: 0, translateY: 40 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                exit={{ opacity: 0, translateY: -40 }}
+                transition={{ duration: 350 }}
+                style={styles.card}
               >
-                {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.loginButtonText}>Đăng nhập</Text>
-                )}
-              </TouchableOpacity>
-            </MotiView>
-          </MotiView>
+                <Text style={styles.formTitle}>Đăng nhập</Text>
+                <Text style={styles.formSubtitle}>Nhập thông tin để tiếp tục</Text>
 
-          {/* SOCIAL + FOOTER */}
-          <MotiView
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ delay: 300, duration: 500 }}
-          >
-            <Text style={styles.orText}>Hoặc tiếp tục với</Text>
+                <View style={styles.inputWrapper}>
+                  <MaterialCommunityIcons name="phone-outline" size={22} color="#333" />
+                  <TextInput
+                    placeholder="Nhập số điện thoại"
+                    placeholderTextColor="#999"
+                    keyboardType="phone-pad"
+                    value={numberPhone}
+                    onChangeText={setNumberPhone}
+                    style={styles.input}
+                  />
+                </View>
 
-            <View style={styles.socialRow}>
-              <TouchableOpacity style={styles.socialBtn}>
-                <AntDesign name="facebook-square" size={26} color="#1877F2" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
-                <AntDesign name="google" size={26} color="#DB4437" />
-              </TouchableOpacity>
-            </View>
+                <View style={styles.inputWrapper}>
+                  <MaterialCommunityIcons name="lock-outline" size={22} color="#333" />
+                  <TextInput
+                    placeholder="Mật khẩu"
+                    placeholderTextColor="#999"
+                    secureTextEntry
+                    value={password}
+                    onChangeText={setPassword}
+                    style={styles.input}
+                  />
+                </View>
 
-            <View style={styles.footerRow}>
-              <Text style={styles.footerText}>Chưa có tài khoản?</Text>
-              <Link href="/(auth)/register" asChild>
-                <TouchableOpacity>
-                  <Text style={styles.registerText}>Đăng ký ngay</Text>
+                <TouchableOpacity style={styles.forgotBtn} onPress={() => setMode("forgot")}>
+                  <Text style={styles.forgotText}>Quên mật khẩu?</Text>
                 </TouchableOpacity>
-              </Link>
-            </View>
-          </MotiView>
 
-        </ScrollView>
-      </KeyboardAvoidingView>
+                <TouchableOpacity
+                  style={[styles.loginButton, loginLoading && { opacity: 0.7 }]}
+                  onPress={handleSignIn}
+                  disabled={loginLoading}
+                >
+                  {loginLoading ? <ActivityIndicator color="#000" /> : <Text style={styles.loginButtonText}>Đăng nhập</Text>}
+                </TouchableOpacity>
+
+                <Text style={styles.orText}>Hoặc tiếp tục với</Text>
+
+                <View style={styles.socialRow}>
+                  <View style={styles.socialBtn}><AntDesign name="apple1" size={24} color="#000" /></View>
+                  <View style={styles.socialBtn}><AntDesign name="google" size={24} color="#DB4437" /></View>
+                  <View style={styles.socialBtn}><AntDesign name="facebook-square" size={24} color="#4267B2" /></View>
+                </View>
+
+                <View style={styles.footerRow}>
+                  <Text style={styles.footerText}>Chưa có tài khoản?</Text>
+                  <TouchableOpacity onPress={() => setMode("register")}>
+                    <Text style={styles.registerText}>Đăng ký ngay</Text>
+                  </TouchableOpacity>
+                </View>
+              </MotiView>
+            )}
+
+            {/* ================= FORGOT FORM ================= */}
+            {mode === "forgot" && (
+              <MotiView
+                key="forgotForm"
+                from={{ opacity: 0, translateY: 60 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                exit={{ opacity: 0, translateY: 40 }}
+                transition={{ duration: 350 }}
+                style={styles.card}
+              >
+                <Text style={styles.formTitle}>Quên mật khẩu</Text>
+                <Text style={styles.formSubtitle}>Nhập số điện thoại để nhận mã OTP</Text>
+
+                <View style={styles.inputWrapper}>
+                  <MaterialCommunityIcons name="phone-outline" size={22} color="#333" />
+                  <TextInput
+                    placeholder="Nhập số điện thoại"
+                    placeholderTextColor="#999"
+                    keyboardType="phone-pad"
+                    value={fpPhone}
+                    onChangeText={setFpPhone}
+                    style={styles.input}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.loginButton, fpLoading && { opacity: 0.7 }]}
+                  disabled={fpLoading}
+                  onPress={handleSendOtp}
+                >
+                  {fpLoading ? <ActivityIndicator color="#000" /> : <Text style={styles.loginButtonText}>Gửi mã OTP</Text>}
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setMode("login")} style={{ alignSelf: "center", marginTop: 16 }}>
+                  <Text style={{ color: "#333", fontWeight: "600" }}>Quay lại đăng nhập</Text>
+                </TouchableOpacity>
+              </MotiView>
+            )}
+
+            {/* ================= REGISTER FORM (KEEP ORIGINAL) ================= */}
+            {mode === "register" && (
+              <MotiView
+                key="registerForm"
+                from={{ opacity: 0, translateY: 70 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                exit={{ opacity: 0, translateY: 40 }}
+                transition={{ duration: 350 }}
+                style={styles.card}
+              >
+                <Text style={styles.title}>Đăng ký tài khoản</Text>
+                <Text style={styles.subtitle}>Nhập thông tin của bạn bên dưới</Text>
+
+                <Text style={styles.label}>Họ và tên</Text>
+                <TextInput
+                  style={styles.input}
+                  value={fullName}
+                  onChangeText={setFullName}
+                  placeholder="Nhập họ tên"
+                  placeholderTextColor="#999"
+                />
+
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="Nhập email"
+                  placeholderTextColor="#999"
+                  keyboardType="email-address"
+                />
+
+                <Text style={styles.label}>Số điện thoại</Text>
+                <TextInput
+                  style={styles.input}
+                  value={rgPhone}
+                  onChangeText={setRgPhone}
+                  placeholder="Nhập số điện thoại"
+                  placeholderTextColor="#999"
+                  keyboardType="phone-pad"
+                />
+
+                <Text style={styles.label}>Mật khẩu</Text>
+                <TextInput
+                  style={styles.input}
+                  secureTextEntry
+                  value={rgPassword}
+                  onChangeText={setRgPassword}
+                  placeholder="Nhập mật khẩu"
+                  placeholderTextColor="#999"
+                />
+
+                <Text style={styles.label}>Xác nhận mật khẩu</Text>
+                <TextInput
+                  style={styles.input}
+                  secureTextEntry
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Nhập lại mật khẩu"
+                  placeholderTextColor="#999"
+                />
+
+                <TouchableOpacity
+                  style={[styles.signUpButton, isLoading && { opacity: 0.6 }]}
+                  disabled={isLoading}
+                  onPress={handleSignUp}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#000" />
+                  ) : (
+                    <Text style={styles.signUpButtonText}>Đăng ký</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setMode("login")} style={{ alignSelf: "center", marginTop: 15 }}>
+                  <Text style={{ color: "#333", fontWeight: "600" }}>Quay lại đăng nhập</Text>
+                </TouchableOpacity>
+              </MotiView>
+            )}
+
+          </AnimatePresence>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-/* =========================== STYLES =========================== */
+/* ===================== STYLES ===================== */
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFDF5',
-  },
-  heroWrapper: {
-    height: 250,
+  container: { flex: 1, backgroundColor: "#FFF" },
+  header: {
+    height: 280,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
-    overflow: 'hidden',
-    backgroundColor: '#FFE9A3',
+    paddingTop: 50,
+    alignItems: "center",
   },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
-  },
-  titleWrapper: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#2A2A2A',
-  },
-  subtitle: {
-    marginTop: 4,
-    fontSize: 15,
-    color: '#6B6B6B',
-  },
+  headerTitle: { fontSize: 22, fontWeight: "800", color: "#333", marginBottom: 10 },
+  headerImage: { width: "88%", height: 160 },
+
+  formArea: { marginTop: -50, paddingHorizontal: 20 },
+
   card: {
-    marginTop: 24,
-    marginHorizontal: 24,
-    padding: 22,
-    borderRadius: 24,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    backgroundColor: "#FFF",
+    padding: 26,
+    borderRadius: 26,
+    marginBottom: 20,
+    elevation: 3,
   },
+
+  formTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#222",
+    textAlign: "center",
+  },
+  formSubtitle: {
+    textAlign: "center",
+    color: "#666",
+    marginTop: 4,
+    marginBottom: 20,
+  },
+
   inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     height: 52,
     borderRadius: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: '#E3D8A5',
+    borderColor: "#E5E5E5",
     paddingHorizontal: 14,
     marginBottom: 14,
   },
-  input: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 15,
-    color: '#2A2A2A',
-  },
-  forgotButton: {
-    alignSelf: 'flex-end',
-    marginBottom: 16,
-  },
-  forgotText: {
-    fontSize: 14,
-    color: '#FF9800',
-    fontWeight: '600',
-  },
+  input: { flex: 1, marginLeft: 10, fontSize: 15, color: "#222" },
+
+  forgotBtn: { alignSelf: "flex-end", marginBottom: 16 },
+  forgotText: { fontSize: 14, color: "#333", fontWeight: "600" },
+
   loginButton: {
     height: 52,
+    backgroundColor: "#FFCC00",
     borderRadius: 16,
-    backgroundColor: '#FFCC00',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#FFCC00',
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
   },
-  loginButtonText: {
-    color: '#222222',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  orText: {
-    marginTop: 22,
-    textAlign: 'center',
-    color: '#7A7A7A',
-    fontSize: 14,
-  },
+  loginButtonText: { color: "#000", fontSize: 17, fontWeight: "700" },
+
+  orText: { textAlign: "center", color: "#777", marginBottom: 18 },
+
   socialRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 16,
-    marginBottom: 26,
-    gap: 20,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 18,
+    marginBottom: 22,
   },
   socialBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#FFFFFF',
+    width: 50,
+    height: 50,
+    backgroundColor: "#FFF",
+    borderRadius: 25,
     borderWidth: 1,
-    borderColor: '#E8D89A',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "#333",
+    justifyContent: "center",
+    alignItems: "center",
   },
+
+  /* REGISTER STYLES */
+  title: { fontSize: 24, fontWeight: "800", textAlign: "center", color: "#222" },
+  subtitle: { textAlign: "center", color: "#666", marginTop: 4, marginBottom: 20 },
+  label: { color: "#444", fontWeight: "600", marginBottom: 6 },
+
+  signUpButton: {
+    backgroundColor: "#FFCC00",
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  signUpButtonText: { color: "#000", fontWeight: "700", fontSize: 16 },
+
   footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 30,
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 16,
   },
-  footerText: {
-    color: '#7A7A7A',
-    marginRight: 4,
-    fontSize: 14,
-  },
-  registerText: {
-    color: '#FF9800',
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  footerText: { color: "#555", marginRight: 6 },
+  registerText: { color: "#000", fontWeight: "700" },
 });
