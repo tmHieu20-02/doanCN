@@ -9,9 +9,11 @@ import {
   Alert,
   SafeAreaView,
   ImageBackground,
+  Image,
 } from "react-native";
-import axios from "axios";
-import * as SecureStore from "expo-secure-store";
+
+import api from "@/utils/api";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import DropDownPicker from "react-native-dropdown-picker";
 
@@ -23,35 +25,45 @@ export default function CreateService() {
   const [duration, setDuration] = useState("");
   const [price, setPrice] = useState("");
 
-  const [categories, setCategories] = useState<{ label: string; value: number }[]>([]);
+  const [image, setImage] = useState<string | null>(null);
+
+  const [categories, setCategories] = useState<
+    { label: string; value: number }[]
+  >([]);
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [openDropdown, setOpenDropdown] = useState(false);
 
-  // Load categories
+  // ================================
+  // PICK IMAGE (preview only)
+  // ================================
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "images", // đúng format Expo 2025
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled) {
+      const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      setImage(base64Image);
+    }
+  };
+
+  // ================================
+  // LOAD CATEGORY
+  // ================================
   const loadCategories = async () => {
     try {
-      const stored = await SecureStore.getItemAsync("my-user-session");
-      const token = stored ? JSON.parse(stored).token : null;
-
-      if (!token) {
-        console.log("CATEGORY ERROR: NO TOKEN");
-        return;
-      }
-
-      const res = await axios.get("https://phatdat.store/api/v1/category/get-all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const res = await api.get("/category/get-all");
       const raw = res.data.categories ?? res.data.data ?? [];
 
-      const formatted = raw.map((c: any) => ({
-        label: c.name,
-        value: c.id,
-      }));
-
-      setCategories(formatted);
-    } catch (err: any) {
-      console.log("CATEGORY ERROR:", err.response?.data || err);
+      setCategories(
+        raw.map((c: any) => ({
+          label: c.name,
+          value: Number(c.id),
+        }))
+      );
+    } catch (err) {
       Alert.alert("Lỗi", "Không thể tải danh mục");
     }
   };
@@ -60,59 +72,72 @@ export default function CreateService() {
     loadCategories();
   }, []);
 
-  // Create service
+  // ================================
+  // CREATE SERVICE
+  // ================================
   const handleCreate = async () => {
-    if (!name || !description || !duration || !price || !categoryId) {
+    if (!name.trim() || !description.trim() || !duration || !price) {
       Alert.alert("Thiếu dữ liệu", "Vui lòng nhập đầy đủ thông tin");
       return;
     }
 
-    try {
-      const stored = await SecureStore.getItemAsync("my-user-session");
-      const token = JSON.parse(stored!).token;
+    if (!categoryId || Number(categoryId) <= 0) {
+      Alert.alert("Lỗi", "Vui lòng chọn danh mục");
+      return;
+    }
 
+    if (isNaN(Number(duration)) || Number(duration) < 1) {
+      Alert.alert("Lỗi", "Thời gian phải là số ≥ 1");
+      return;
+    }
+
+    if (isNaN(Number(price)) || Number(price) < 10000) {
+      Alert.alert("Lỗi", "Giá phải ≥ 10000");
+      return;
+    }
+
+    try {
       const body = {
         name,
         description,
         duration_minutes: Number(duration),
         price: Number(price),
-        category_id: categoryId,
+        category_id: Number(categoryId),
         is_active: true,
       };
 
-      const res = await axios.post(
-        "https://phatdat.store/api/v1/service/create",
-        body,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      await api.post("/service/create", body);
 
       Alert.alert("Thành công", "Đã tạo dịch vụ thành công!");
       router.push("/staff/(stafftabs)/services?reload=1");
-
     } catch (err: any) {
-      console.log("SERVICE ERROR:", err.response?.data);
-      Alert.alert("Lỗi", err.response?.data?.message || "Không thể tạo dịch vụ.");
+      console.log("AXIOS ERROR:", err.response?.data);
+      Alert.alert("Lỗi", err.response?.data?.message || "Không thể tạo dịch vụ");
     }
   };
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ImageBackground
-     source={require("../../../assets/images/bg-blur.png")}
-
+        source={require("../../../assets/images/bg-blur.png")}
         style={styles.bg}
         resizeMode="contain"
         imageStyle={{ opacity: 0.15 }}
       >
         <ScrollView showsVerticalScrollIndicator={false}>
-          
           <View style={styles.card}>
             <Text style={styles.title}>Tạo dịch vụ mới</Text>
+
+            {/* IMAGE PREVIEW */}
+            <TouchableOpacity onPress={pickImage}>
+              {image ? (
+                <Image source={{ uri: image }} style={styles.preview} />
+              ) : (
+                <View style={styles.imagePicker}>
+                  <Text style={{ color: "#777" }}>Chọn hình dịch vụ</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
             <Text style={styles.label}>Tên dịch vụ</Text>
             <TextInput
@@ -125,7 +150,7 @@ export default function CreateService() {
             <Text style={styles.label}>Mô tả</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Mô tả"
+              placeholder="Mô tả dịch vụ"
               multiline
               value={description}
               onChangeText={setDescription}
@@ -134,7 +159,7 @@ export default function CreateService() {
             <Text style={styles.label}>Thời gian (phút)</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ví dụ: 60"
+              placeholder="60"
               keyboardType="numeric"
               value={duration}
               onChangeText={setDuration}
@@ -143,7 +168,7 @@ export default function CreateService() {
             <Text style={styles.label}>Giá dịch vụ</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ví dụ: 200000"
+              placeholder="200000"
               keyboardType="numeric"
               value={price}
               onChangeText={setPrice}
@@ -180,7 +205,6 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     backgroundColor: "#F8F8F8",
   },
-
   card: {
     backgroundColor: "#FFFFFF",
     padding: 26,
@@ -192,7 +216,6 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 60,
   },
-
   title: {
     fontSize: 26,
     fontWeight: "700",
@@ -200,14 +223,12 @@ const styles = StyleSheet.create({
     marginBottom: 22,
     color: "#222",
   },
-
   label: {
     fontSize: 15,
     fontWeight: "600",
     marginBottom: 6,
     color: "#444",
   },
-
   input: {
     height: 48,
     borderWidth: 1,
@@ -217,12 +238,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#FAFAFA",
     marginBottom: 16,
   },
-
   textArea: {
     height: 100,
     textAlignVertical: "top",
   },
-
+  preview: {
+    width: "100%",
+    height: 150,
+    borderRadius: 14,
+    marginBottom: 16,
+  },
+  imagePicker: {
+    height: 150,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FAFAFA",
+    marginBottom: 16,
+  },
   dropdown: {
     borderWidth: 1,
     borderColor: "#DDDDDD",
@@ -230,12 +265,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: "#FAFAFA",
   },
-
   dropdownContainer: {
     borderWidth: 1,
     borderColor: "#DDDDDD",
   },
-
   btn: {
     backgroundColor: "#FFD600",
     paddingVertical: 14,
@@ -243,7 +276,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
-
   btnText: {
     fontSize: 17,
     fontWeight: "700",

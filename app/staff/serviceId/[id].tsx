@@ -63,7 +63,7 @@ export default function ServiceDetail() {
           description: service.description,
           duration_minutes: Number(service.duration_minutes),
           price: Number(service.price),
-          category_id: Number(service.category_id),
+          category_id: String(service.category_id),
           is_active: Boolean(service.is_active),
         },
         {
@@ -191,9 +191,10 @@ router.push({
           style={styles.input}
           keyboardType="numeric"
           value={String(service.category_id)}
-          onChangeText={(t) =>
-            setService({ ...service, category_id: Number(t) })
-          }
+        onChangeText={(t) =>
+  setService({ ...service, category_id: String(t) })
+}
+
         />
       </View>
 
