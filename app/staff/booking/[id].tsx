@@ -30,13 +30,10 @@ export default function BookingDetail() {
 
       const res = await axios.get(
         "https://phatdat.store/api/v1/booking/get-all",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       const found = res.data.data.find((b: any) => b.id == id);
-
       setBooking(found);
     } catch (err: any) {
       console.log("Lỗi:", err?.response?.data || err);
@@ -67,14 +64,11 @@ export default function BookingDetail() {
           status: booking.status,
           note: booking.note,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       Alert.alert("Thành công", "Cập nhật booking thành công!");
-      router.push("../../(tabs)/bookings?reload=1");
-
+      router.push("/staff/(stafftabs)/bookings?reload=1");
 
     } catch (err: any) {
       Alert.alert(
@@ -85,42 +79,14 @@ export default function BookingDetail() {
   };
 
   // =============================
-  //  CANCEL booking
+  //  Staff KHÔNG được hủy booking theo ID
   // =============================
   const cancelBooking = () => {
-    Alert.alert("Hủy booking", "Bạn có chắc muốn hủy?", [
-      { text: "Không" },
-      {
-        text: "Hủy",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const stored = await SecureStore.getItemAsync("my-user-session");
-            const token = JSON.parse(stored!).token;
-
-            await axios.patch(
-              `https://phatdat.store/api/v1/booking/cancel/${id}`,
-              {
-                cancel_note: "Staff hủy lịch",
-              },
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            );
-
-            Alert.alert("Đã hủy booking");
-           router.push("../../(tabs)/bookings?reload=1");
-
-
-          } catch (err: any) {
-            Alert.alert(
-              "Lỗi",
-              err?.response?.data?.message || "Không thể hủy booking"
-            );
-          }
-        },
-      },
-    ]);
+    Alert.alert(
+      "Không thể hủy lịch",
+      "Nhân viên không được phép hủy lịch theo ID. Muốn hủy, hãy dùng chức năng 'Hủy tất cả lịch hẹn hôm nay' trong trang quản lý.",
+      [{ text: "OK" }]
+    );
   };
 
   if (loading) {
@@ -196,7 +162,7 @@ export default function BookingDetail() {
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.deleteBtn} onPress={cancelBooking}>
-        <Text style={styles.deleteText}>Hủy booking</Text>
+        <Text style={styles.deleteText}>Không thể hủy lịch tại đây</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -244,11 +210,11 @@ const styles = StyleSheet.create({
   saveText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 
   deleteBtn: {
-    backgroundColor: "#DC2626",
+    backgroundColor: "#9CA3AF",
     paddingVertical: 15,
     borderRadius: 12,
     alignItems: "center",
     marginBottom: 40,
   },
-  deleteText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  deleteText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 });

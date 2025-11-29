@@ -9,13 +9,15 @@ import {
   Alert,
   SafeAreaView,
   ImageBackground,
-  Image,
+  Pressable,
 } from "react-native";
 
 import api from "@/utils/api";
-import * as ImagePicker from "expo-image-picker";
+import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 import DropDownPicker from "react-native-dropdown-picker";
+import { LinearGradient } from "expo-linear-gradient";
+import { ArrowLeft, Clock, Tag, DollarSign, List } from "lucide-react-native";
 
 export default function CreateService() {
   const router = useRouter();
@@ -25,29 +27,11 @@ export default function CreateService() {
   const [duration, setDuration] = useState("");
   const [price, setPrice] = useState("");
 
-  const [image, setImage] = useState<string | null>(null);
-
   const [categories, setCategories] = useState<
     { label: string; value: number }[]
   >([]);
-  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [categoryId, setCategoryId] = useState<number>(0);
   const [openDropdown, setOpenDropdown] = useState(false);
-
-  // ================================
-  // PICK IMAGE (preview only)
-  // ================================
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images", // đúng format Expo 2025
-      quality: 0.7,
-      base64: true,
-    });
-
-    if (!result.canceled) {
-      const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      setImage(base64Image);
-    }
-  };
 
   // ================================
   // LOAD CATEGORY
@@ -63,7 +47,7 @@ export default function CreateService() {
           value: Number(c.id),
         }))
       );
-    } catch (err) {
+    } catch {
       Alert.alert("Lỗi", "Không thể tải danh mục");
     }
   };
@@ -97,6 +81,15 @@ export default function CreateService() {
     }
 
     try {
+      const stored = await SecureStore.getItemAsync("my-user-session");
+      const staff = stored ? JSON.parse(stored) : null;
+      const token: string = staff?.token ?? "";
+
+      if (!token) {
+        Alert.alert("Lỗi", "Không tìm thấy token đăng nhập");
+        return;
+      }
+
       const body = {
         name,
         description,
@@ -106,13 +99,18 @@ export default function CreateService() {
         is_active: true,
       };
 
-      await api.post("/service/create", body);
+    await api.post("/service/create", body, {
+  headers: {
+    Authorization: `Bearer ${token}`,
+  },
+});
+
 
       Alert.alert("Thành công", "Đã tạo dịch vụ thành công!");
       router.push("/staff/(stafftabs)/services?reload=1");
     } catch (err: any) {
       console.log("AXIOS ERROR:", err.response?.data);
-      Alert.alert("Lỗi", err.response?.data?.message || "Không thể tạo dịch vụ");
+      Alert.alert("Lỗi", err.response?.data?.mes || "Không thể tạo dịch vụ");
     }
   };
 
@@ -126,26 +124,27 @@ export default function CreateService() {
       >
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
-            <Text style={styles.title}>Tạo dịch vụ mới</Text>
+              <View style={styles.cardHeader}>
+                <Pressable style={styles.backButton} onPress={() => router.back()}>
+                  <ArrowLeft size={18} color="#111827" />
+                </Pressable>
 
-            {/* IMAGE PREVIEW */}
-            <TouchableOpacity onPress={pickImage}>
-              {image ? (
-                <Image source={{ uri: image }} style={styles.preview} />
-              ) : (
-                <View style={styles.imagePicker}>
-                  <Text style={{ color: "#777" }}>Chọn hình dịch vụ</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+                <Text style={styles.title}>Tạo dịch vụ mới</Text>
+
+                <View style={{ width: 34 }} />
+              </View>
 
             <Text style={styles.label}>Tên dịch vụ</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập tên dịch vụ"
-              value={name}
-              onChangeText={setName}
-            />
+            <View style={styles.inputRow}>
+              <View style={styles.leftIcon}><Tag size={16} color="#6B7280" /></View>
+              <TextInput
+                style={[styles.input, styles.inputWithIcon]}
+                placeholder="Nhập tên dịch vụ"
+                value={name}
+                onChangeText={setName}
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
 
             <Text style={styles.label}>Mô tả</Text>
             <TextInput
@@ -157,24 +156,33 @@ export default function CreateService() {
             />
 
             <Text style={styles.label}>Thời gian (phút)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="60"
-              keyboardType="numeric"
-              value={duration}
-              onChangeText={setDuration}
-            />
+            <View style={styles.inputRow}>
+              <View style={styles.leftIcon}><Clock size={16} color="#6B7280" /></View>
+              <TextInput
+                style={[styles.input, styles.inputWithIcon]}
+                placeholder="60"
+                keyboardType="numeric"
+                value={duration}
+                onChangeText={setDuration}
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
 
             <Text style={styles.label}>Giá dịch vụ</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="200000"
-              keyboardType="numeric"
-              value={price}
-              onChangeText={setPrice}
-            />
+            <View style={styles.inputRow}>
+              <View style={styles.leftIcon}><DollarSign size={16} color="#6B7280" /></View>
+              <TextInput
+                style={[styles.input, styles.inputWithIcon]}
+                placeholder="200000"
+                keyboardType="numeric"
+                value={price}
+                onChangeText={setPrice}
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
 
-            <Text style={styles.label}>Danh mục</Text>
+            <View style={{ marginBottom: 8 }}>
+              <Text style={[styles.label, { marginBottom: 8 }]}>Danh mục</Text>
             <DropDownPicker
               open={openDropdown}
               value={categoryId}
@@ -188,9 +196,12 @@ export default function CreateService() {
               dropDownContainerStyle={styles.dropdownContainer}
             />
 
-            <TouchableOpacity style={styles.btn} onPress={handleCreate}>
-              <Text style={styles.btnText}>Tạo dịch vụ</Text>
-            </TouchableOpacity>
+            <LinearGradient colors={["#FFD600", "#FFC107"]} style={styles.btnGradient}>
+              <TouchableOpacity style={[styles.btn, { backgroundColor: 'transparent' }]} onPress={handleCreate}>
+                <Text style={styles.btnText}>Tạo dịch vụ</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+            </View>
           </View>
         </ScrollView>
       </ImageBackground>
@@ -216,12 +227,14 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 60,
   },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  backButton: { width: 34, height: 34, justifyContent: 'center', alignItems: 'center', borderRadius: 10, backgroundColor: '#F3F4F6' },
   title: {
     fontSize: 26,
     fontWeight: "700",
     textAlign: "center",
     marginBottom: 22,
-    color: "#222",
+    color: "#111827",
   },
   label: {
     fontSize: 15,
@@ -238,25 +251,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#FAFAFA",
     marginBottom: 16,
   },
+  inputRow: { flexDirection: 'row', alignItems: 'center' },
+  leftIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  inputWithIcon: { flex: 1, marginBottom: 16, backgroundColor: '#FAFAFA' },
   textArea: {
     height: 100,
     textAlignVertical: "top",
-  },
-  preview: {
-    width: "100%",
-    height: 150,
-    borderRadius: 14,
-    marginBottom: 16,
-  },
-  imagePicker: {
-    height: 150,
-    borderWidth: 1,
-    borderColor: "#DDD",
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FAFAFA",
-    marginBottom: 16,
   },
   dropdown: {
     borderWidth: 1,
@@ -269,12 +269,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#DDDDDD",
   },
+  btnGradient: { borderRadius: 16, marginTop: 10, overflow: 'hidden' },
   btn: {
     backgroundColor: "#FFD600",
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 0,
   },
   btnText: {
     fontSize: 17,

@@ -24,7 +24,7 @@ export default function StaffServices() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  /** 🔵 LẤY CATEGORY */
+  /** 🔵 FETCH CATEGORY */
   const fetchCategories = async () => {
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
@@ -35,13 +35,13 @@ export default function StaffServices() {
       });
 
       setCategories(res.data?.data || []);
-   } catch (err) {
-  console.log("Lỗi lấy category:", (err as any)?.response?.data || err);
+    } catch (err: any) {
+  console.log("Lỗi lấy category:", err?.response?.data || err);
 }
 
   };
 
-  /** 🔵 LẤY SERVICE */
+  /** 🔵 FETCH SERVICES */
   const fetchServices = async () => {
     try {
       setLoading(true);
@@ -65,18 +65,15 @@ export default function StaffServices() {
     }
   };
 
-  /** 🔵 LOAD LẦN ĐẦU */
   useEffect(() => {
     fetchCategories();
     fetchServices();
   }, []);
 
-  /** 🔵 RELOAD SAU CREATE/UPDATE */
   useEffect(() => {
     if (reload) fetchServices();
   }, [reload]);
 
-  /** 🔵 RELOAD SAU KHI CHỌN CATEGORY */
   useEffect(() => {
     fetchServices();
   }, [selectedCategory]);
@@ -87,91 +84,100 @@ export default function StaffServices() {
     setRefreshing(false);
   };
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#FFB300" />
-        <Text style={{ marginTop: 12 }}>Đang tải dịch vụ...</Text>
-      </View>
-    );
-  }
-
-  /** 🔵 GIAO DIỆN 1 ITEM SERVICE */
+  /** 🔵 SERVICE CARD */
   const renderItem = ({ item }: any) => (
     <TouchableOpacity
       style={styles.card}
       onPress={() => router.push(`/staff/serviceId/${item.id}`)}
+      activeOpacity={0.7}
     >
-      <Text style={styles.name}>{item.name}</Text>
-      <Text style={styles.desc}>{item.description}</Text>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardTitle}>{item.name}</Text>
+        <Text style={styles.cardDuration}>{item.duration_minutes} phút</Text>
+      </View>
 
-      {/* category name */}
       {item.category?.name && (
-        <Text style={styles.category}>Danh mục: {item.category.name}</Text>
+        <Text style={styles.cardCategory}>{item.category.name}</Text>
       )}
 
-      <View style={styles.row}>
-        <Text style={styles.price}>{item.price.toLocaleString()} đ</Text>
-        <Text style={styles.duration}>{item.duration_minutes} phút</Text>
+      <Text style={styles.cardDescription} numberOfLines={2}>
+        {item.description}
+      </Text>
+
+      <View style={styles.cardFooter}>
+        <Text style={styles.cardPrice}>{item.price.toLocaleString()} đ</Text>
       </View>
     </TouchableOpacity>
   );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingBox}>
+        <ActivityIndicator size="large" color="#FFB300" />
+        <Text style={{ marginTop: 14, color: "#444" }}>Đang tải dịch vụ...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
 
       {/* HEADER */}
       <View style={styles.headerRow}>
-        <Text style={styles.header}>Danh sách dịch vụ</Text>
+        <View>
+          <Text style={styles.headerTitle}>Quản lý dịch vụ</Text>
+          <Text style={styles.headerSubtitle}>Danh sách dịch vụ hiện có</Text>
+        </View>
 
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => router.push("/staff/serviceId/create")}
         >
-          <Plus color="#fff" size={20} />
-          <Text style={styles.addText}>Thêm</Text>
+          <Plus size={18} color="#fff" />
+          <Text style={styles.addButtonText}>Tạo mới</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 🔵 FILTER CATEGORY */}
+      {/* CATEGORY FILTER */}
       <FlatList
         horizontal
         data={[{ id: null, name: "Tất cả" }, ...categories]}
         keyExtractor={(item) => String(item.id)}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterList}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[
-              styles.filterBtn,
-              selectedCategory === item.id && styles.filterBtnActive,
+              styles.filterItem,
+              selectedCategory === item.id && styles.filterItemActive,
             ]}
             onPress={() => setSelectedCategory(item.id)}
           >
             <Text
               style={[
-                styles.filterText,
-                selectedCategory === item.id && styles.filterTextActive,
+                styles.filterItemText,
+                selectedCategory === item.id && styles.filterItemTextActive,
               ]}
             >
               {item.name}
             </Text>
           </TouchableOpacity>
         )}
-        showsHorizontalScrollIndicator={false}
-        style={{ marginBottom: 12 }}
       />
 
-      {/* LIST SERVICES */}
+      {/* SERVICE LIST */}
       <FlatList
         data={services}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 30 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        contentContainerStyle={{ paddingBottom: 20 }}
         ListEmptyComponent={
-          <View style={styles.center}>
-            <Text style={{ color: "#777" }}>Không có dịch vụ nào</Text>
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyText}>Không có dịch vụ nào</Text>
           </View>
         }
       />
@@ -179,83 +185,135 @@ export default function StaffServices() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { padding: 16, flex: 1, backgroundColor: "#F5F6F8" },
+/* ======================= STYLES ======================= */
 
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F6F6F8",
+    padding: 16,
+  },
+
+  /* HEADER */
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 18,
   },
-  header: { fontSize: 22, fontWeight: "700" },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#222",
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: "#777",
+    marginTop: 2,
+  },
 
   addButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFB300",
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 12,
+    elevation: 2,
   },
-  addText: {
-    color: "#fff",
+  addButtonText: {
+    color: "white",
     fontWeight: "600",
     marginLeft: 6,
+    fontSize: 14,
   },
 
   /* FILTER */
-  filterBtn: {
+  filterList: {
+    paddingVertical: 4,
+    marginBottom: 16,
+  },
+  filterItem: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#ddd",
     borderRadius: 20,
     marginRight: 8,
     backgroundColor: "#fff",
   },
-  filterBtnActive: {
+  filterItemActive: {
     backgroundColor: "#FFB300",
     borderColor: "#FFB300",
   },
-  filterText: {
+  filterItemText: {
     fontSize: 13,
     color: "#444",
   },
-  filterTextActive: {
+  filterItemTextActive: {
     color: "#fff",
+    fontWeight: "600",
   },
 
   /* SERVICE CARD */
   card: {
     backgroundColor: "#fff",
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 12,
     elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
-  name: {
-    fontSize: 17,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  desc: {
-    fontSize: 13,
-    color: "#666",
+  cardRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 6,
   },
-  category: {
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#222",
+    flex: 1,
+    marginRight: 10,
+  },
+  cardDuration: {
+    fontSize: 13,
+    color: "#888",
+  },
+  cardCategory: {
     fontSize: 13,
     color: "#1E88E5",
     fontWeight: "600",
+    marginBottom: 4,
+  },
+  cardDescription: {
+    fontSize: 13,
+    color: "#666",
     marginBottom: 10,
   },
-  row: {
+  cardFooter: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
   },
-  price: { fontWeight: "700", color: "#222" },
-  duration: { color: "#777" },
+  cardPrice: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#222",
+  },
 
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  /* EMPTY */
+  emptyBox: {
+    alignItems: "center",
+    marginTop: 30,
+  },
+  emptyText: {
+    color: "#777",
+    fontSize: 14,
+  },
+
+  /* LOADING */
+  loadingBox: { flex: 1, justifyContent: "center", alignItems: "center" },
 });

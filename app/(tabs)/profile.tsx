@@ -208,11 +208,15 @@ const handleChangeAvatar = async () => {
                   <TouchableOpacity
                     key={item.id}
                     onPress={() => {
-                      if (item.id === "edit-profile") {
-                       router.push("/profile/edit");
+                     if (item.id === "edit-profile") {
+  router.push("/profile/edit");
+}
+
+if (item.id === "favorites") {
+  router.push("/profile/favorites");
+}
 
 
-                      }
                     }}
                     style={[
                       styles.menuItem,

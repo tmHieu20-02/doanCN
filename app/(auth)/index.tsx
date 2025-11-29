@@ -18,14 +18,14 @@ export default function AuthWelcomeScreen() {
         <View style={styles.footer}>
           <TouchableOpacity 
             style={[styles.button, styles.primaryButton]}
-            onPress={() => router.push('/login')} // Điều hướng sang file login.tsx
+            onPress={() => router.push({ pathname: '/(auth)/login' })} // Điều hướng sang file login.tsx
           >
             <Text style={styles.primaryButtonText}>Đăng nhập</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={[styles.button, styles.secondaryButton]}
-            onPress={() => router.push('/register')} // Điều hướng sang file register.tsx
+            onPress={() => router.push({ pathname: '/(auth)/login', params: { mode: 'register' } })} // Mở màn đăng ký trong login.tsx
           >
             <Text style={styles.secondaryButtonText}>Tạo tài khoản mới</Text>
           </TouchableOpacity>

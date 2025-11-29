@@ -35,7 +35,13 @@ export default function ForgotPasswordScreen() {
       });
 
       if (res.data.err === 0) {
-        const token = res.data.reset_token;
+        // support both reset_token and resetToken keys returned by backend
+        const token = res.data.reset_token ?? res.data.resetToken ?? res.data.resetToken;
+        if (!token) {
+          console.warn('Forgot: server returned success but no reset token', res.data);
+          Alert.alert('Lỗi', 'Máy chủ không trả về mã xác thực để xác minh. Vui lòng thử lại.');
+          return;
+        }
 
         router.push({
           pathname: "/verify-reset-otp",

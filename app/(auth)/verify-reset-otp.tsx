@@ -9,22 +9,45 @@ export default function VerifyResetOtp() {
   const [otp, setOtp] = useState("");
 
   const handleVerify = async () => {
-    try {
-      const res = await api.post("/auth/verify-reset-otp", {
-        reset_token: token,
-        otp,
-      });
-
-      if (res.data.err === 0) {
-        router.push({
-          pathname: "/reset-password",
-          params: { token },
-        });
-      } else {
-        Alert.alert("Lỗi", res.data.mes);
+    // Try several token key variations in case backend accepts different param names
+    const candidateKeys = ["reset_token", "resetToken", "token"];
+    let lastResp: any = null;
+    let ok = false;
+    for (const key of candidateKeys) {
+      try {
+        const body: any = { otp };
+        body[key] = token;
+        const res = await api.post("/auth/verify-reset-otp", body);
+        console.log('VERIFY-RESET ATTEMPT:', key, res.status, res.data);
+        lastResp = res;
+        if (res.data.err === 0 || res.status >= 200 && res.status < 300) {
+          ok = true;
+          router.push({ pathname: "/reset-password", params: { token } });
+          break;
+        }
+      } catch (e) {
+        lastResp = e as any;
+        console.warn('VERIFY-RESET attempt failed for', key, e?.response?.data ?? e?.message ?? e);
       }
-    } catch (e) {
-      Alert.alert("Lỗi", "Không thể xác minh OTP.");
+    }
+
+    if (!ok) {
+      // final attempt: send token in Authorization header
+      try {
+        const hdrRes = await api.post("/auth/verify-reset-otp", { otp }, { headers: { Authorization: `Bearer ${token}` } });
+        console.log('VERIFY-RESET ATTEMPT header:', hdrRes.status, hdrRes.data);
+        if (hdrRes.data.err === 0 || (hdrRes.status >= 200 && hdrRes.status < 300)) {
+          router.push({ pathname: "/reset-password", params: { token } });
+          return;
+        }
+        lastResp = hdrRes;
+      } catch (eHdr) {
+        lastResp = eHdr as any;
+        console.warn('Header attempt failed', eHdr?.response?.data ?? eHdr?.message ?? eHdr);
+      }
+
+      const msg = lastResp?.data?.mes || lastResp?.data?.message || JSON.stringify(lastResp?.data || lastResp) || 'Không thể xác minh OTP.';
+      Alert.alert('Lỗi', String(msg));
     }
   };
 

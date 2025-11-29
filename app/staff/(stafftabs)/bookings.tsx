@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import axios from "axios";
+import { cancelAllBookings as cancelAllService } from "../serviceId/bookingService";
 import * as SecureStore from "expo-secure-store";
 
 type BookingStatus = "" | "pending" | "confirmed" | "done" | "cancelled";
@@ -20,7 +22,7 @@ export default function StaffBooking() {
   const [statusFilter, setStatusFilter] = useState<BookingStatus>("");
 
   // ==========================
-  // 🔹 GET ALL BOOKINGS
+  // 🔵 GET ALL BOOKINGS
   // ==========================
   const fetchBookings = async (opts?: { silent?: boolean }) => {
     try {
@@ -41,10 +43,7 @@ export default function StaffBooking() {
       );
 
       const list =
-        res.data?.bookings ||
-        res.data?.data ||
-        res.data?.items ||
-        [];
+        res.data?.bookings || res.data?.data || res.data?.items || [];
 
       setBookings(list);
     } catch (err: any) {
@@ -65,28 +64,28 @@ export default function StaffBooking() {
   };
 
   // ==========================
-  // 🔹 CONFIRM BOOKING
+  // 🔵 CONFIRM 1 BOOKING
   // ==========================
   const confirmBooking = async (booking: any) => {
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const token = JSON.parse(stored!).token;
 
-     const body = {
-  service_id: booking.service_id,
-  booking_date: booking.booking_date,
-  start_time: booking.start_time?.slice(0, 5),  // 🔥 FIX CHÍNH
-  end_time: booking.end_time?.slice(0, 5),      // 🔥 FIX CHÍNH
-  note: booking.note || "",
-  status: "confirmed",
-};
+      const body = {
+        service_id: booking.service_id,
+        booking_date: booking.booking_date,
+        start_time: booking.start_time?.slice(0, 5),
+        end_time: booking.end_time?.slice(0, 5),
+        note: booking.note || "",
+        status: "confirmed",
+      };
 
-      const res = await axios.put(
+      await axios.put(
         `https://phatdat.store/api/v1/booking/update/${booking.id}`,
         body,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      console.log("🔍 API UPDATE RESPONSE:", res.data);
+
       fetchBookings({ silent: true });
     } catch (error: any) {
       console.log("❌ Lỗi xác nhận:", error?.response?.data || error);
@@ -94,7 +93,38 @@ export default function StaffBooking() {
   };
 
   // ==========================
-  // 🔹 UI HELPERS
+  // 🔵 HỦY TẤT CẢ LỊCH HẸN (FINAL)
+  // ==========================
+  const handleCancelAllBookings = () => {
+    Alert.alert(
+      "Hủy toàn bộ lịch hẹn hôm nay",
+      "Bạn có chắc muốn hủy TẤT CẢ lịch hẹn hôm nay không?",
+      [
+        { text: "Không" },
+        {
+          text: "Hủy tất cả",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const body = {
+                cancel_note: "Shop nghỉ đột xuất",
+              };
+
+              const res = await cancelAllService(body);
+              console.log("🔥 HỦY TOÀN BỘ THÀNH CÔNG:", res.data);
+
+              fetchBookings({ silent: true });
+            } catch (error: any) {
+              console.log("❌ Lỗi hủy all:", error?.response?.data || error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // ==========================
+  // 🔵 UI
   // ==========================
   const renderStatusBadge = (status: string) => {
     let bg = "#6B7280";
@@ -126,62 +156,46 @@ export default function StaffBooking() {
     );
   };
 
-  const formatDateTime = (item: any) => {
-    const date = item.booking_date?.slice(0, 10) || "";
-    const time = item.start_time || "";
-    if (!date || !time) return "Không rõ thời gian";
-    return `${time} • ${date}`;
-  };
+  const renderItem = ({ item }: any) => {
+    const serviceName =
+      item.service?.name || item.service_name || "Dịch vụ";
 
-  // ==========================
-  // 🔹 RENDER ITEM – UI PREMIUM
-  // ==========================
- const renderItem = ({ item }: any) => {
-  const serviceName =
-    item.service?.name || item.service_name || "Dịch vụ";
+    const customerName =
+      item.customer?.full_name || item.user_name || "Ẩn danh";
 
-  const customerName =
-    item.customer?.full_name ||
-    item.user_name ||
-    "Ẩn danh";
+    const price =
+      item.service?.price || item.total_price || 0;
 
-  const price =
-    item.service?.price ||
-    item.total_price ||
-    0;
+    const status = item.status || "pending";
 
-  const status = item.status || "pending";
+    return (
+      <View style={styles.card}>
+        <View style={{ position: "absolute", top: 10, right: 10 }}>
+          {renderStatusBadge(status)}
+        </View>
 
-  return (
-    <View style={styles.card}>
+        <Text style={styles.service}>{serviceName}</Text>
+        <Text style={styles.customer}>Khách: {customerName}</Text>
+        <Text style={styles.customer}>Giá: {price.toLocaleString()}đ</Text>
 
-      {/* 🔹  Badge ở góc phải trên  */}
-      <View style={{ position: "absolute", top: 10, right: 10 }}>
-        {renderStatusBadge(status)}
+        <Text style={styles.time}>
+          {item.start_time?.slice(0, 5)} - {item.end_time?.slice(0, 5)} •{" "}
+          {item.booking_date?.slice(0, 10)}
+        </Text>
+
+        {status === "pending" && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: "#2563EB" }]}
+              onPress={() => confirmBooking(item)}
+            >
+              <Text style={styles.actionText}>Xác nhận</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-
-      {/* Nội dung chính */}
-      <Text style={styles.service}>{serviceName}</Text>
-      <Text style={styles.customer}>Khách: {customerName}</Text>
-      <Text style={styles.customer}>Giá: {price.toLocaleString()}đ</Text>
-
-      {/* 🔹 Xác nhận ở góc dưới bên phải */}
-      {status === "pending" && (
-        <TouchableOpacity
-          onPress={() => confirmBooking(item)}
-          style={styles.confirmBtnFixed}
-        >
-          <Text style={styles.confirmText}>Xác nhận</Text>
-          
-
-        </TouchableOpacity>
-      )}
-
-      {/* Thời gian bên trái dưới */}
-      <Text style={styles.time}>{formatDateTime(item)}</Text>
-    </View>
-  );
-};
+    );
+  };
 
   const renderFilterButton = (label: string, value: BookingStatus) => {
     const active = statusFilter === value;
@@ -212,7 +226,18 @@ export default function StaffBooking() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Lịch hẹn của bạn</Text>
-      <Text style={styles.sub}>Xem và quản lý các lịch hẹn được giao cho bạn</Text>
+
+      {/* 🔥 NÚT HỦY TẤT CẢ LỊCH HẸN */}
+      <TouchableOpacity
+        style={styles.cancelAllBtn}
+        onPress={handleCancelAllBookings}
+      >
+        <Text style={styles.cancelAllText}>Hủy lịch hôm nay</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.sub}>
+        Xem và quản lý các lịch hẹn được giao cho bạn
+      </Text>
 
       <View style={styles.filterRow}>
         {renderFilterButton("Tất cả", "")}
@@ -241,78 +266,92 @@ export default function StaffBooking() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F3F4F6", padding: 16 },
+  container: { flex: 1, backgroundColor: "#F7F7F7", padding: 16 },
 
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  title: { fontSize: 24, fontWeight: "700", color: "#111827" },
-  sub: { fontSize: 14, color: "#6B7280", marginTop: 4, marginBottom: 10 },
+  title: { fontSize: 22, fontWeight: "700", color: "#111827" },
 
-  filterRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 8 },
+  sub: { fontSize: 13, color: "#6B7280", marginTop: 4, marginBottom: 14 },
+
+  cancelAllBtn: {
+    alignSelf: "flex-start",
+    backgroundColor: "#EF4444",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  cancelAllText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+
+  filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 6,
+  },
   filterBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 30,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#D1D5DB",
-    marginRight: 8,
-    marginBottom: 8,
+    marginRight: 6,
+    marginBottom: 6,
+    backgroundColor: "#FFF",
   },
-  filterBtnActive: { backgroundColor: "#2563EB", borderColor: "#2563EB" },
+  filterBtnActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
   filterText: { fontSize: 12, color: "#4B5563", fontWeight: "500" },
   filterTextActive: { color: "#FFF" },
 
   card: {
-    backgroundColor: "#FFF",
-    padding: 16,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
     borderRadius: 14,
     marginBottom: 12,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
 
-  service: { fontSize: 17, fontWeight: "700", color: "#111827" },
-  customer: { fontSize: 14, color: "#374151", marginTop: 4 },
+  service: { fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 2 },
+  customer: { fontSize: 13, color: "#374151", marginTop: 2 },
 
   time: {
-    fontSize: 13,
+    fontSize: 12,
     color: "#6B7280",
     marginTop: 8,
   },
 
   badge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    marginRight: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
   },
-  badgeText: { color: "#FFF", fontSize: 11, fontWeight: "600" },
+  badgeText: { color: "#FFF", fontSize: 10, fontWeight: "600" },
 
-  confirmBtn: {
-    backgroundColor: "#2563EB",
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+  actionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 12,
+    gap: 8,
+  },
+  actionBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
     borderRadius: 8,
   },
-  confirmText: {
-    color: "#FFF",
-    fontSize: 12,
-    fontWeight: "600",
-  },
+  actionText: { color: "#FFF", fontSize: 12, fontWeight: "600" },
 
   emptyBox: { alignItems: "center", marginTop: 60 },
-  emptyText: { color: "#6B7280", fontSize: 15 },
-  confirmBtnFixed: {
-  position: "absolute",
-  bottom: 10,
-  right: 10,
-  backgroundColor: "#2563EB",
-  paddingVertical: 6,
-  paddingHorizontal: 12,
-  borderRadius: 8,
-},
-
+  emptyText: { color: "#6B7280", fontSize: 14 },
 });

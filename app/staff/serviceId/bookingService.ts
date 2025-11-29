@@ -32,20 +32,19 @@ export const updateBookingById = async (id: string, body: any) => {
 // ==========================
 // CANCEL 1 BOOKING
 // ==========================
-// 👉 FE gửi object { cancel_note: "..." }, nên phải nhận body: any
 export const cancelBookingById = async (id: string, body: any) => {
   const token = await getToken();
-  return axios.patch(`${BASE_URL}/cancel/${id}`, body, {
+  return axios.post(`${BASE_URL}/cancel/${id}`, body, {
     headers: { Authorization: `Bearer ${token}` },
   });
 };
 
 // ==========================
-// CANCEL ALL BOOKINGS
+// CANCEL ALL BOOKINGS (FINAL)
 // ==========================
 export const cancelAllBookings = async (body: any) => {
   const token = await getToken();
-  return axios.patch(`${BASE_URL}/cancel-all`, body, {
+  return axios.post(`${BASE_URL}/cancel-all`, body, {
     headers: { Authorization: `Bearer ${token}` },
   });
 };

@@ -11,14 +11,10 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Search, MapPin, Star, Clock, Filter } from "lucide-react-native";
+import { Search, MapPin, Star, Clock, Filter, Heart } from "lucide-react-native";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-
-// Hooks
 import { useCategories, Category } from "../../hooks/useCategories";
-
-// Theme
 import { colors } from "@/ui/theme";
 
 export type Service = {
@@ -36,13 +32,16 @@ export type Service = {
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [user, setUser] = useState<any>(null);
-
   const { categories } = useCategories();
 
   const [services, setServices] = useState<Service[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState("");
 
+  // ⭐ DANH SÁCH YÊU THÍCH (list id)
+  const [favoriteServices, setFavoriteServices] = useState<number[]>([]);
+
+  /* ------------------------ LOAD SERVICES ------------------------ */
   useEffect(() => {
     const fetchServices = async () => {
       try {
@@ -57,20 +56,19 @@ export default function HomeScreen() {
 
         const json = await res.json();
 
-       const mapped = (json.data || [])
-  .filter((s: any) => s && s.id) // lọc phần tử undefined
-  .map((s: any) => ({
-    id: s.id,
-    name: s.name || "Dịch vụ",
-    description: s.description || "",
-    image: "https://picsum.photos/400",
-    price: s.price || 0,
-    duration: `${s.duration_minutes || 30} phút`,
-    categoryId: s.category_id || 0,
-    rating: 4.8,
-    reviewCount: 100,
-  }));
-
+        const mapped = (json.data || [])
+          .filter((s: any) => s && s.id)
+          .map((s: any) => ({
+            id: s.id,
+            name: s.name || "Dịch vụ",
+            description: s.description || "",
+            image: "https://picsum.photos/400",
+            price: s.price || 0,
+            duration: `${s.duration_minutes || 30} phút`,
+            categoryId: s.category_id || 0,
+            rating: 4.8,
+            reviewCount: 100,
+          }));
 
         setServices(mapped);
       } catch (e) {
@@ -83,6 +81,7 @@ export default function HomeScreen() {
     fetchServices();
   }, []);
 
+  /* ------------------------ LOAD USER ------------------------ */
   useEffect(() => {
     const loadUserInfo = async () => {
       const value = await SecureStore.getItemAsync("my-user-session");
@@ -91,75 +90,111 @@ export default function HomeScreen() {
     loadUserInfo();
   }, []);
 
+  /* ------------------------ LOAD FAVORITES ------------------------ */
+  useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        const saved = await SecureStore.getItemAsync("favorite-services");
+        setFavoriteServices(saved ? JSON.parse(saved) : []);
+      } catch {
+        setFavoriteServices([]);
+      }
+    };
+    loadFavorites();
+  }, []);
+
+  /* ------------------------ TOGGLE FAVORITE ------------------------ */
+  const toggleFavorite = async (id: number) => {
+    try {
+      const saved = await SecureStore.getItemAsync("favorite-services");
+      const current: number[] = saved ? JSON.parse(saved) : [];
+
+      let updated: number[] = [];
+
+      if (current.includes(id)) {
+        updated = current.filter((f: number) => f !== id);
+      } else {
+        updated = [...current, id];
+      }
+
+      setFavoriteServices(updated);
+
+      await SecureStore.setItemAsync("favorite-services", JSON.stringify(updated));
+
+      console.log("⭐ Favorite updated:", updated);
+
+    } catch (error) {
+      console.log("Favorite error:", error);
+    }
+  };
+
+  /* ------------------------ SEARCH ------------------------ */
   const handleSearchSubmit = () => {
     if (!searchQuery.trim()) return;
     router.push({ pathname: "/search", params: { q: searchQuery } });
   };
 
-  const renderServiceCard = ({ item }: { item: Service }) => (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      style={styles.serviceCard}
-      onPress={() =>
-        router.push({ pathname: "/service/[id]", params: { id: item.id } })
-      }
-    >
-      <Image
-        source={{ uri: item.image }}
-        style={styles.serviceImage}
-      />
+  /* ------------------------ RENDER SERVICE CARD ------------------------ */
+  const renderServiceCard = ({ item }: { item: Service }) => {
+    const isFav = favoriteServices.includes(item.id);
 
-      <View style={styles.serviceInfo}>
-        <Text style={styles.serviceName} numberOfLines={1}>
-          {item.name}
-        </Text>
+    return (
+      <View style={styles.serviceCardWrapper}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={styles.serviceCard}
+          onPress={() =>
+            router.push({ pathname: "/service/[id]", params: { id: item.id } })
+          }
+        >
+          <Image source={{ uri: item.image }} style={styles.serviceImage} />
 
-        <Text style={styles.serviceCategory}>Danh mục #{item.categoryId}</Text>
+          <View style={styles.serviceInfo}>
+            <Text style={styles.serviceName} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.serviceCategory}>Danh mục #{item.categoryId}</Text>
 
-        <View style={styles.serviceDetails}>
-          <View style={styles.ratingContainer}>
-            <Star size={14} color={colors.warning} fill={colors.warning} />
-            <Text style={styles.rating}>{item.rating}</Text>
-            <Text style={styles.reviewCount}>({item.reviewCount})</Text>
+            <View style={styles.serviceDetails}>
+              <View style={styles.ratingContainer}>
+                <Star size={14} color={colors.warning} fill={colors.warning} />
+                <Text style={styles.rating}>{item.rating}</Text>
+                <Text style={styles.reviewCount}>({item.reviewCount})</Text>
+              </View>
+
+              <View style={styles.locationContainer}>
+                <MapPin size={14} color="#9CA3AF" />
+                <Text style={styles.distance}>0.5km</Text>
+              </View>
+            </View>
+
+            <View style={styles.priceContainer}>
+              <Text style={styles.price}>
+                {Number(String(item.price).replace(/\D/g, "")).toLocaleString("vi-VN")}đ
+              </Text>
+              <View style={styles.durationContainer}>
+                <Clock size={14} color="#9CA3AF" />
+                <Text style={styles.duration}>{item.duration}</Text>
+              </View>
+            </View>
           </View>
+        </TouchableOpacity>
 
-          <View style={styles.locationContainer}>
-            <MapPin size={14} color="#9CA3AF" />
-            <Text style={styles.distance}>0.5km</Text>
-          </View>
-        </View>
-
-        <View style={styles.priceContainer}>
-          <Text style={styles.price}>
-  {Number(String(item.price).replace(/\D/g, "")).toLocaleString("vi-VN")}đ
-</Text>
-
-          <View style={styles.durationContainer}>
-            <Clock size={14} color="#9CA3AF" />
-            <Text style={styles.duration}>{item.duration}</Text>
-          </View>
-        </View>
+        {/* ❤️ icon yêu thích */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={styles.favoriteIcon}
+          onPress={() => toggleFavorite(item.id)}
+        >
+          <Heart
+            size={22}
+            color={isFav ? "#EF4444" : "#F97316"}
+            fill={isFav ? "#EF4444" : "transparent"}
+          />
+        </TouchableOpacity>
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
 
-  const renderCategoryItem = ({ item }: { item: Category }) => (
-    <TouchableOpacity
-      style={styles.categoryItem}
-      onPress={() =>
-        router.push({
-          pathname: "/search",
-          params: { category: item.name },
-        })
-      }
-    >
-      <View style={styles.categoryIcon}>
-        <Text style={styles.categoryEmoji}>{item.icon ?? "⭐"}</Text>
-      </View>
-      <Text style={styles.categoryName}>{item.name}</Text>
-    </TouchableOpacity>
-  );
-
+  /* ------------------------ HEADER ------------------------ */
   const HeaderComponent = (
     <View>
       <LinearGradient
@@ -191,6 +226,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* SEARCH */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
             <Search size={20} color="#A1A1AA" />
@@ -201,6 +237,7 @@ export default function HomeScreen() {
               onChangeText={setSearchQuery}
               placeholderTextColor="#9CA3AF"
               onSubmitEditing={handleSearchSubmit}
+              returnKeyType="search"
             />
             <TouchableOpacity style={styles.filterButton}>
               <Filter size={20} color={colors.primaryAlt} />
@@ -217,10 +254,7 @@ export default function HomeScreen() {
       </View>
 
       {servicesLoading && (
-        <ActivityIndicator
-          color={colors.primaryAlt}
-          style={{ marginTop: 30 }}
-        />
+        <ActivityIndicator color={colors.primaryAlt} style={{ marginTop: 30 }} />
       )}
 
       {servicesError && (
@@ -307,16 +341,36 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingHorizontal: 20,
   },
-  serviceCard: {
+
+  serviceCardWrapper: {
     width: "48%",
+    position: "relative",
+  },
+
+  serviceCard: {
     backgroundColor: colors.card,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   serviceImage: { width: "100%", height: 120, resizeMode: "cover" },
   serviceInfo: { padding: 10 },
+
+  favoriteIcon: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    padding: 6,
+    borderRadius: 20,
+  },
 
   serviceName: { fontSize: 14, fontWeight: "700", color: colors.text },
   serviceCategory: { fontSize: 12, color: colors.textMuted, marginTop: 3 },
@@ -349,7 +403,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  /* ---------------- CATEGORY ---------------- */
+  /* CATEGORY */
   categoryItem: {
     alignItems: "center",
     marginRight: 12,
@@ -381,5 +435,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-
-
