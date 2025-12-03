@@ -22,21 +22,23 @@ export default function ServiceDetail() {
   const [service, setService] = useState<any>(null);
 
   // =============================
-  // LOAD SERVICE BY ID
+  // LOAD SERVICE BY ID (backend không có API get/{id})
   // =============================
   const loadService = async () => {
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const token = JSON.parse(stored!).token;
 
+      // backend chỉ có get-all -> phải filter bằng FE
       const res = await axios.get(
-        `https://phatdat.store/api/v1/service/get/${id}`,
+        "https://phatdat.store/api/v1/service/get-all",
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      setService(res.data.data);
+      const found = res.data?.data?.find((s: any) => s.id == Number(id));
+      setService(found || null);
     } catch (err: any) {
       console.log("Lỗi load service:", err?.response?.data);
     } finally {
@@ -54,30 +56,35 @@ export default function ServiceDetail() {
   const updateService = async () => {
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
-      const token = JSON.parse(stored!).token;
+      if (!stored) {
+        Alert.alert("Lỗi", "Không tìm thấy session. Vui lòng đăng nhập lại.");
+        return;
+      }
+
+      const token = JSON.parse(stored).token;
+
+      const body = {
+        name: service.name,
+        description: service.description,
+        duration_minutes: Number(service.duration_minutes),
+        price: Number(service.price),
+        category_id: Number(service.category_id),
+        is_active: Boolean(service.is_active),
+      };
 
       await axios.put(
         `https://phatdat.store/api/v1/service/update/${id}`,
-        {
-          name: service.name,
-          description: service.description,
-          duration_minutes: Number(service.duration_minutes),
-          price: Number(service.price),
-          category_id: String(service.category_id),
-          is_active: Boolean(service.is_active),
-        },
+        body,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
       Alert.alert("Thành công", "Cập nhật dịch vụ thành công!");
-
-     router.push({
-  pathname: "/staff/(stafftabs)/services",
-  params: { reload: "1" },
-});
-
+      router.push({
+        pathname: "/staff/(stafftabs)/services",
+        params: { reload: "1" },
+      });
     } catch (err: any) {
       Alert.alert(
         "Lỗi",
@@ -108,11 +115,10 @@ export default function ServiceDetail() {
             );
 
             Alert.alert("Đã xóa dịch vụ");
-router.push({
-  pathname: "/staff/(stafftabs)/services",
-  params: { reload: "1" },
-});
-
+            router.push({
+              pathname: "/staff/(stafftabs)/services",
+              params: { reload: "1" },
+            });
           } catch (err: any) {
             Alert.alert(
               "Lỗi",
@@ -125,7 +131,7 @@ router.push({
   };
 
   // =============================
-  // LOADING UI
+  // UI LOADING
   // =============================
   if (loading) {
     return (
@@ -181,9 +187,7 @@ router.push({
           style={styles.input}
           keyboardType="numeric"
           value={String(service.price)}
-          onChangeText={(t) =>
-            setService({ ...service, price: Number(t) })
-          }
+          onChangeText={(t) => setService({ ...service, price: Number(t) })}
         />
 
         <Text style={styles.label}>ID danh mục</Text>
@@ -191,10 +195,9 @@ router.push({
           style={styles.input}
           keyboardType="numeric"
           value={String(service.category_id)}
-        onChangeText={(t) =>
-  setService({ ...service, category_id: String(t) })
-}
-
+          onChangeText={(t) =>
+            setService({ ...service, category_id: Number(t) })
+          }
         />
       </View>
 

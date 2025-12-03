@@ -6,7 +6,6 @@ const api = axios.create({
   timeout: 10000,
 });
 
-// Tự động gắn token vào mọi request
 api.interceptors.request.use(async (config) => {
   const stored = await SecureStore.getItemAsync("my-user-session");
   if (stored) {

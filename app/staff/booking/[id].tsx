@@ -20,21 +20,20 @@ export default function BookingDetail() {
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState<any>(null);
 
-  // =============================
-  //  Load booking theo ID
-  // =============================
+  // ==================================================
+  //  LOAD BOOKING ĐÚNG CHUẨN API /get-detail/:id
+  // ==================================================
   const fetchBooking = async () => {
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const token = JSON.parse(stored!).token;
 
       const res = await axios.get(
-        "https://phatdat.store/api/v1/booking/get-all",
+        `https://phatdat.store/api/v1/booking/get-detail/${id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      const found = res.data.data.find((b: any) => b.id == id);
-      setBooking(found);
+      setBooking(res.data.data || res.data.booking);
     } catch (err: any) {
       console.log("Lỗi:", err?.response?.data || err);
     } finally {
@@ -46,9 +45,9 @@ export default function BookingDetail() {
     fetchBooking();
   }, [id]);
 
-  // =============================
-  //  Update booking
-  // =============================
+  // ==================================================
+  //  UPDATE BOOKING
+  // ==================================================
   const updateBooking = async () => {
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
@@ -59,8 +58,8 @@ export default function BookingDetail() {
         {
           service_id: Number(booking.service_id),
           booking_date: booking.booking_date,
-          start_time: booking.start_time,
-          end_time: booking.end_time,
+          start_time: booking.start_time?.slice(0, 5),
+          end_time: booking.end_time?.slice(0, 5),
           status: booking.status,
           note: booking.note,
         },
@@ -78,9 +77,9 @@ export default function BookingDetail() {
     }
   };
 
-  // =============================
-  //  Staff KHÔNG được hủy booking theo ID
-  // =============================
+  // ==================================================
+  //  STAFF KHÔNG ĐƯỢC HỦY BOOKING THEO ID
+  // ==================================================
   const cancelBooking = () => {
     Alert.alert(
       "Không thể hủy lịch",
@@ -89,6 +88,9 @@ export default function BookingDetail() {
     );
   };
 
+  // ==================================================
+  // UI
+  // ==================================================
   if (loading) {
     return (
       <View style={styles.center}>
@@ -107,17 +109,14 @@ export default function BookingDetail() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Chỉnh sửa booking</Text>
+      <Text style={styles.title}>Chỉnh sửa booking #{id}</Text>
 
       <View style={styles.card}>
         <Text style={styles.label}>ID Dịch vụ</Text>
         <TextInput
           style={styles.input}
           value={String(booking.service_id)}
-          onChangeText={(t) =>
-            setBooking({ ...booking, service_id: Number(t) })
-          }
-          keyboardType="numeric"
+          onChangeText={(t) => setBooking({ ...booking, service_id: Number(t) })}
         />
 
         <Text style={styles.label}>Ngày booking</Text>
@@ -130,14 +129,14 @@ export default function BookingDetail() {
         <Text style={styles.label}>Giờ bắt đầu</Text>
         <TextInput
           style={styles.input}
-          value={booking.start_time}
+          value={booking.start_time?.slice(0, 5)}
           onChangeText={(t) => setBooking({ ...booking, start_time: t })}
         />
 
         <Text style={styles.label}>Giờ kết thúc</Text>
         <TextInput
           style={styles.input}
-          value={booking.end_time}
+          value={booking.end_time?.slice(0, 5)}
           onChangeText={(t) => setBooking({ ...booking, end_time: t })}
         />
 
@@ -170,9 +169,7 @@ export default function BookingDetail() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#F3F4F6" },
-
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-
   title: { fontSize: 24, fontWeight: "700", marginBottom: 16 },
 
   card: {

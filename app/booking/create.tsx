@@ -13,6 +13,8 @@ import * as SecureStore from "expo-secure-store";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { colors, radius, shadow, spacing } from "../../ui/theme";
+import { AppIcons } from "@/ui/icons";
+
 
 export default function CreateBooking() {
   const router = useRouter();

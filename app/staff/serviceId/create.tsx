@@ -17,7 +17,9 @@ import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 import DropDownPicker from "react-native-dropdown-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { ArrowLeft, Clock, Tag, DollarSign, List } from "lucide-react-native";
+import { ArrowLeft, Clock, Tag, DollarSign } from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
+import { Image } from "react-native";
 
 export default function CreateService() {
   const router = useRouter();
@@ -27,11 +29,35 @@ export default function CreateService() {
   const [duration, setDuration] = useState("");
   const [price, setPrice] = useState("");
 
+  const [image, setImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<any>(null);
+
   const [categories, setCategories] = useState<
     { label: string; value: number }[]
   >([]);
   const [categoryId, setCategoryId] = useState<number>(0);
   const [openDropdown, setOpenDropdown] = useState(false);
+
+  // ================================
+  // CHỌN ẢNH - UPLOAD FILE
+  // ================================
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      setImage(asset.uri);
+      setImageFile({
+        uri: asset.uri,
+        name: asset.fileName ?? "service.jpg",
+        type: asset.mimeType ?? "image/jpeg",
+      });
+    }
+  };
 
   // ================================
   // LOAD CATEGORY
@@ -65,52 +91,53 @@ export default function CreateService() {
       return;
     }
 
+    if (!imageFile) {
+      Alert.alert("Thiếu ảnh", "Vui lòng chọn ảnh dịch vụ");
+      return;
+    }
+
     if (!categoryId || Number(categoryId) <= 0) {
       Alert.alert("Lỗi", "Vui lòng chọn danh mục");
       return;
     }
 
-    if (isNaN(Number(duration)) || Number(duration) < 1) {
-      Alert.alert("Lỗi", "Thời gian phải là số ≥ 1");
-      return;
-    }
-
-    if (isNaN(Number(price)) || Number(price) < 10000) {
-      Alert.alert("Lỗi", "Giá phải ≥ 10000");
-      return;
-    }
-
+    let token = "";
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const staff = stored ? JSON.parse(stored) : null;
-      const token: string = staff?.token ?? "";
+      token = staff?.token ?? "";
 
       if (!token) {
         Alert.alert("Lỗi", "Không tìm thấy token đăng nhập");
         return;
       }
 
-      const body = {
-        name,
-        description,
-        duration_minutes: Number(duration),
-        price: Number(price),
-        category_id: Number(categoryId),
-        is_active: true,
-      };
+      // Tạo formData
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("description", description);
+      formData.append("duration_minutes", String(duration));
+      formData.append("price", String(price));
+      formData.append("category_id", String(categoryId));
+      formData.append("is_active", "true");
+      formData.append("image", imageFile); // FILE UPLOAD
 
-    await api.post("/service/create", body, {
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-});
-
+      const res = await api.post("/service/create", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
       Alert.alert("Thành công", "Đã tạo dịch vụ thành công!");
       router.push("/staff/(stafftabs)/services?reload=1");
     } catch (err: any) {
-      console.log("AXIOS ERROR:", err.response?.data);
-      Alert.alert("Lỗi", err.response?.data?.mes || "Không thể tạo dịch vụ");
+      const msg =
+        err?.response?.data?.mes ||
+        err?.response?.data ||
+        err?.message ||
+        "Không thể tạo dịch vụ";
+      Alert.alert("Lỗi", String(msg));
     }
   };
 
@@ -124,19 +151,21 @@ export default function CreateService() {
       >
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Pressable style={styles.backButton} onPress={() => router.back()}>
-                  <ArrowLeft size={18} color="#111827" />
-                </Pressable>
+            <View style={styles.cardHeader}>
+              <Pressable style={styles.backButton} onPress={() => router.back()}>
+                <ArrowLeft size={18} color="#111827" />
+              </Pressable>
 
-                <Text style={styles.title}>Tạo dịch vụ mới</Text>
+              <Text style={styles.title}>Tạo dịch vụ mới</Text>
+              <View style={{ width: 34 }} />
+            </View>
 
-                <View style={{ width: 34 }} />
-              </View>
-
+            {/* Name */}
             <Text style={styles.label}>Tên dịch vụ</Text>
             <View style={styles.inputRow}>
-              <View style={styles.leftIcon}><Tag size={16} color="#6B7280" /></View>
+              <View style={styles.leftIcon}>
+                <Tag size={16} color="#6B7280" />
+              </View>
               <TextInput
                 style={[styles.input, styles.inputWithIcon]}
                 placeholder="Nhập tên dịch vụ"
@@ -146,6 +175,7 @@ export default function CreateService() {
               />
             </View>
 
+            {/* Description */}
             <Text style={styles.label}>Mô tả</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
@@ -155,9 +185,12 @@ export default function CreateService() {
               onChangeText={setDescription}
             />
 
+            {/* Duration */}
             <Text style={styles.label}>Thời gian (phút)</Text>
             <View style={styles.inputRow}>
-              <View style={styles.leftIcon}><Clock size={16} color="#6B7280" /></View>
+              <View style={styles.leftIcon}>
+                <Clock size={16} color="#6B7280" />
+              </View>
               <TextInput
                 style={[styles.input, styles.inputWithIcon]}
                 placeholder="60"
@@ -168,9 +201,12 @@ export default function CreateService() {
               />
             </View>
 
+            {/* Price */}
             <Text style={styles.label}>Giá dịch vụ</Text>
             <View style={styles.inputRow}>
-              <View style={styles.leftIcon}><DollarSign size={16} color="#6B7280" /></View>
+              <View style={styles.leftIcon}>
+                <DollarSign size={16} color="#6B7280" />
+              </View>
               <TextInput
                 style={[styles.input, styles.inputWithIcon]}
                 placeholder="200000"
@@ -181,8 +217,24 @@ export default function CreateService() {
               />
             </View>
 
-            <View style={{ marginBottom: 8 }}>
-              <Text style={[styles.label, { marginBottom: 8 }]}>Danh mục</Text>
+            {/* IMAGE UPLOAD */}
+            <Text style={styles.label}>Ảnh dịch vụ</Text>
+            <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+              <Text style={{ color: "#555" }}>
+                {image ? "Đổi ảnh" : "Chọn ảnh dịch vụ"}
+              </Text>
+            </TouchableOpacity>
+
+            {image && (
+              <Image
+                source={{ uri: image }}
+                style={{ width: "100%", height: 200, borderRadius: 12, marginBottom: 16 }}
+                resizeMode="cover"
+              />
+            )}
+
+            {/* CATEGORY */}
+            <Text style={[styles.label, { marginBottom: 8 }]}>Danh mục</Text>
             <DropDownPicker
               open={openDropdown}
               value={categoryId}
@@ -196,12 +248,12 @@ export default function CreateService() {
               dropDownContainerStyle={styles.dropdownContainer}
             />
 
+            {/* SUBMIT */}
             <LinearGradient colors={["#FFD600", "#FFC107"]} style={styles.btnGradient}>
-              <TouchableOpacity style={[styles.btn, { backgroundColor: 'transparent' }]} onPress={handleCreate}>
+              <TouchableOpacity style={[styles.btn]} onPress={handleCreate}>
                 <Text style={styles.btnText}>Tạo dịch vụ</Text>
               </TouchableOpacity>
             </LinearGradient>
-            </View>
           </View>
         </ScrollView>
       </ImageBackground>
@@ -209,6 +261,9 @@ export default function CreateService() {
   );
 }
 
+// ================================
+// STYLES
+// ================================
 const styles = StyleSheet.create({
   bg: {
     flex: 1,
@@ -227,8 +282,20 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 60,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  backButton: { width: 34, height: 34, justifyContent: 'center', alignItems: 'center', borderRadius: 10, backgroundColor: '#F3F4F6' },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  backButton: {
+    width: 34,
+    height: 34,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 10,
+    backgroundColor: "#F3F4F6",
+  },
   title: {
     fontSize: 26,
     fontWeight: "700",
@@ -251,13 +318,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#FAFAFA",
     marginBottom: 16,
   },
-  inputRow: { flexDirection: 'row', alignItems: 'center' },
-  leftIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  inputWithIcon: { flex: 1, marginBottom: 16, backgroundColor: '#FAFAFA' },
-  textArea: {
-    height: 100,
-    textAlignVertical: "top",
+  inputRow: { flexDirection: "row", alignItems: "center" },
+  leftIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
   },
+  inputWithIcon: { flex: 1, marginBottom: 16 },
+  textArea: { height: 100, textAlignVertical: "top" },
   dropdown: {
     borderWidth: 1,
     borderColor: "#DDDDDD",
@@ -269,13 +341,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#DDDDDD",
   },
-  btnGradient: { borderRadius: 16, marginTop: 10, overflow: 'hidden' },
+  imagePicker: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  btnGradient: { borderRadius: 16, marginTop: 10, overflow: "hidden" },
   btn: {
-    backgroundColor: "#FFD600",
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: "center",
-    marginTop: 0,
   },
   btnText: {
     fontSize: 17,

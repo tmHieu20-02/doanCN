@@ -25,9 +25,9 @@ import * as SecureStore from 'expo-secure-store';
 import api from '../../utils/api';
 import { colors, radius, shadow } from '@/ui/theme';
 
-// ==============================
-// 1️⃣ EmptyState Component
-// ==============================
+/* ------------------------------------ */
+/* Empty State */
+/* ------------------------------------ */
 const EmptyState = ({
   icon,
   title,
@@ -53,9 +53,9 @@ const EmptyState = ({
   </View>
 );
 
-// ==============================
-// 2️⃣ Types
-// ==============================
+/* ------------------------------------ */
+/* Types */
+/* ------------------------------------ */
 type BookingTab = {
   id: 'upcoming' | 'completed' | 'cancelled';
   name: string;
@@ -64,6 +64,7 @@ type BookingTab = {
 
 type Booking = {
   id: number;
+  serviceId: number;            // ⭐ thêm để truyền rating
   serviceName: string;
   serviceType: string;
   date: string;
@@ -75,9 +76,9 @@ type Booking = {
   canCancel?: boolean;
 };
 
-// ==============================
-// 3️⃣ Component chính
-// ==============================
+/* ------------------------------------ */
+/* MAIN COMPONENT */
+/* ------------------------------------ */
 export default function BookingsScreen() {
   const router = useRouter();
 
@@ -89,9 +90,9 @@ export default function BookingsScreen() {
   const [completed, setCompleted] = useState<Booking[]>([]);
   const [cancelled, setCancelled] = useState<Booking[]>([]);
 
-  // ==============================
-  //  Fetch bookings
-  // ==============================
+  /* ------------------------------------ */
+  /* Fetch bookings */
+  /* ------------------------------------ */
   const fetchBookings = async () => {
     try {
       setLoading(true);
@@ -108,35 +109,27 @@ export default function BookingsScreen() {
       }
 
       const res = await api.get('/booking/get-all');
-      console.log('>>> RAW BOOKING API:', res.data);
-
       const list = res.data.bookings || res.data.data || [];
 
-      // Lọc theo user_id của người dùng hiện tại
       const userBookings = list.filter((b: any) => b.user_id === userId);
-      console.log('>>> FILTERED BOOKINGS FOR USER:', userBookings);
 
       const up: Booking[] = [];
       const com: Booking[] = [];
       const can: Booking[] = [];
 
-      // PHẢI forEach trên userBookings (đã fix)
       userBookings.forEach((item: any) => {
         const rawStatus = (item.status || '').toLowerCase();
 
         const booking: Booking = {
           id: item.id,
+          serviceId: item.service?.id,    // ⭐ thêm đúng từ API
           serviceName: item.service?.name || 'Dịch vụ',
           serviceType: item.service?.category_name || 'Không có danh mục',
-          date: item.booking_date
-            ? String(item.booking_date).slice(0, 10)
-            : '',
-          time: item.start_time
-            ? String(item.start_time).slice(0, 5)
-            : '',
+          date: item.booking_date ? String(item.booking_date).slice(0, 10) : '',
+          time: item.start_time ? String(item.start_time).slice(0, 5) : '',
           duration: `${item.service?.duration_minutes || 60} phút`,
           price: item.total_price || item.service?.price || 0,
-          status: rawStatus || 'pending',
+          status: rawStatus,
           address: 'Tại cửa hàng',
           canCancel: true,
         };
@@ -174,36 +167,50 @@ export default function BookingsScreen() {
 
   const handleBookNow = () => router.push('/');
 
-  // ==============================
-  //  Hủy lịch (gọi API thật)
-  // ==============================
+  /* ------------------------------------ */
+  /* Cancel booking API */
+  /* ------------------------------------ */
   const handleCancelBooking = (bookingId: number) => {
-    Alert.alert('Xác nhận hủy', 'Bạn có chắc chắn muốn hủy lịch hẹn này?', [
-      { text: 'Không', style: 'cancel' },
-      {
-        text: 'Hủy lịch',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            // Backend đang khai báo POST /booking/cancel/:id
-            await api.post(`/booking/cancel/${bookingId}`, {
-              cancel_note: 'Người dùng đã hủy lịch',
-            });
+  Alert.alert("Xác nhận hủy lịch", "Bạn có chắc chắn muốn hủy lịch hẹn này?", [
+    { text: "Không", style: "cancel" },
+    {
+      text: "Hủy lịch",
+      style: "destructive",
+      onPress: async () => {
+        try {
+          const res = await api.post(`/booking/cancel/${bookingId}`, {
+            cancel_note: "Người dùng đã hủy lịch",
+          });
 
-            Alert.alert('Thành công', 'Đã hủy lịch hẹn.');
+          console.log("CANCEL RESPONSE:", res.data);
+
+          if (res.data?.err === 0) {
+            Alert.alert("Thành công", "Đã hủy lịch hẹn.");
             onRefresh();
-          } catch (error) {
-            console.error('CANCEL BOOKING ERROR:', error);
-            Alert.alert('Lỗi', 'Không thể hủy lịch hẹn lúc này.');
+          } else {
+            Alert.alert("Lỗi", res.data?.mes || "Không thể hủy lịch.");
           }
-        },
-      },
-    ]);
-  };
+        } catch (error: any) {
+          console.log(
+            "CANCEL ERROR:",
+            error?.response?.data || error.message || error
+          );
 
-  // ==============================
-  //  Helpers
-  // ==============================
+          Alert.alert(
+            "Lỗi",
+            error?.response?.data?.mes ||
+              "Không thể hủy lịch hẹn. Vui lòng thử lại."
+          );
+        }
+      },
+    },
+  ]);
+};
+
+
+  /* ------------------------------------ */
+  /* Helpers */
+/* ------------------------------------ */
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -222,12 +229,10 @@ export default function BookingsScreen() {
     }
   };
 
-  const formatPrice = (price: string | number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(Number(price));
-  };
+  const formatPrice = (price: string | number) =>
+    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
+      Number(price)
+    );
 
   const bookingTabs: BookingTab[] = [
     { id: 'upcoming', name: 'Sắp tới', count: upcoming.length },
@@ -241,11 +246,12 @@ export default function BookingsScreen() {
     return cancelled;
   };
 
-  // ==============================
-  //  Render UI
-  // ==============================
+  /* ------------------------------------ */
+  /* Render Tab Button */
+  /* ------------------------------------ */
   const renderTabButton = ({ item }: { item: BookingTab }) => {
     const isActive = activeTab === item.id;
+
     return (
       <TouchableOpacity
         style={[styles.tabButton, isActive && styles.tabButtonActive]}
@@ -259,6 +265,7 @@ export default function BookingsScreen() {
         >
           {item.name}
         </Text>
+
         {item.count > 0 && (
           <View style={[styles.tabBadge, isActive && styles.tabBadgeActive]}>
             <Text
@@ -275,6 +282,9 @@ export default function BookingsScreen() {
     );
   };
 
+  /* ------------------------------------ */
+  /* Render Booking Item */
+/* ------------------------------------ */
   const renderBookingItem = ({ item }: { item: Booking }) => {
     const statusStyle = getStatusStyle(item.status);
 
@@ -286,9 +296,7 @@ export default function BookingsScreen() {
             <Text style={styles.serviceName}>{item.serviceName}</Text>
             <Text style={styles.serviceType}>{item.serviceType}</Text>
           </View>
-          <View
-            style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}
-          >
+          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
             <Text style={[styles.statusText, { color: statusStyle.text }]}>
               {statusStyle.label}
             </Text>
@@ -309,9 +317,7 @@ export default function BookingsScreen() {
           </View>
           <View style={styles.detailRow}>
             <MapPin size={16} color={colors.textMuted} />
-            <Text style={styles.detailText} numberOfLines={1}>
-              {item.address}
-            </Text>
+            <Text style={styles.detailText}>{item.address}</Text>
           </View>
         </View>
 
@@ -336,6 +342,24 @@ export default function BookingsScreen() {
                 <Text style={styles.cancelButtonText}>Hủy lịch</Text>
               </TouchableOpacity>
             )}
+
+            {/* ⭐ Completed → Rating */}
+            {activeTab === 'completed' && (
+              <TouchableOpacity
+                style={styles.ratingButton}
+                onPress={() =>
+                  router.push({
+                    pathname: '/rating/create',
+                    params: {
+                      serviceId: item.serviceId,     // ⭐ fixed
+                      bookingId: item.id,
+                    },
+                  })
+                }
+              >
+                <Text style={styles.ratingButtonText}>Đánh giá</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -344,6 +368,9 @@ export default function BookingsScreen() {
 
   const currentBookings = getCurrentBookings();
 
+  /* ------------------------------------ */
+  /* UI */
+/* ------------------------------------ */
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
@@ -416,9 +443,9 @@ export default function BookingsScreen() {
   );
 }
 
-// ==============================
-// 5️⃣ Styles
-// ==============================
+/* ------------------------------------ */
+/* STYLES */
+/* ------------------------------------ */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
@@ -452,14 +479,15 @@ const styles = StyleSheet.create({
     ...shadow.card,
     marginBottom: 24,
   },
-  tabsList: {},
+  tabsList: {}, 
+  
+
   tabButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingHorizontal: 8,
     borderRadius: radius.lg,
   },
   tabButtonActive: {
@@ -476,8 +504,8 @@ const styles = StyleSheet.create({
   tabBadge: {
     backgroundColor: '#F3F4F6',
     borderRadius: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     marginLeft: 4,
   },
   tabBadgeActive: {
@@ -496,6 +524,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 100,
   },
+
   bookingCard: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
@@ -525,6 +554,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textMuted,
   },
+
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -563,10 +593,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.primaryAlt,
   },
+
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+
   iconButton: {
     width: 38,
     height: 38,
@@ -576,6 +608,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 8,
   },
+
   cancelButton: {
     paddingHorizontal: 14,
     paddingVertical: 9,
@@ -586,6 +619,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.danger,
+  },
+
+  ratingButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    backgroundColor: '#FEE2B3',
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  ratingButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#B45309',
   },
 
   emptyWrapper: {

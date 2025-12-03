@@ -8,14 +8,16 @@ import {
   TextInput,
   FlatList,
   SafeAreaView,
-  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Search, MapPin, Star, Clock, Filter, Heart } from "lucide-react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router"; // ⭐ THÊM
 import * as SecureStore from "expo-secure-store";
-import { useCategories, Category } from "../../hooks/useCategories";
+import { useCategories } from "../../hooks/useCategories";
 import { colors } from "@/ui/theme";
+
+// Skeleton
+import HomeSkeleton from "../../components/common/skeletons/HomeSkeleton";
 
 export type Service = {
   id: number;
@@ -32,16 +34,15 @@ export type Service = {
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [user, setUser] = useState<any>(null);
-  const { categories } = useCategories();
 
+  const { categories } = useCategories();
   const [services, setServices] = useState<Service[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState("");
 
-  // ⭐ DANH SÁCH YÊU THÍCH (list id)
   const [favoriteServices, setFavoriteServices] = useState<number[]>([]);
 
-  /* ------------------------ LOAD SERVICES ------------------------ */
+  /* --------------- LOAD SERVICES --------------- */
   useEffect(() => {
     const fetchServices = async () => {
       try {
@@ -62,7 +63,7 @@ export default function HomeScreen() {
             id: s.id,
             name: s.name || "Dịch vụ",
             description: s.description || "",
-            image: "https://picsum.photos/400",
+            image: s.image || "https://picsum.photos/400",
             price: s.price || 0,
             duration: `${s.duration_minutes || 30} phút`,
             categoryId: s.category_id || 0,
@@ -74,14 +75,16 @@ export default function HomeScreen() {
       } catch (e) {
         setServicesError("Không thể tải dịch vụ.");
       } finally {
-        setServicesLoading(false);
+        setTimeout(() => {
+          setServicesLoading(false);
+        }, 800);
       }
     };
 
     fetchServices();
   }, []);
 
-  /* ------------------------ LOAD USER ------------------------ */
+  /* --------------- LOAD USER ONCE --------------- */
   useEffect(() => {
     const loadUserInfo = async () => {
       const value = await SecureStore.getItemAsync("my-user-session");
@@ -90,51 +93,49 @@ export default function HomeScreen() {
     loadUserInfo();
   }, []);
 
-  /* ------------------------ LOAD FAVORITES ------------------------ */
+  /* --------------- AUTO REFRESH USER WHEN HOME FOCUSED --------------- */
+  useFocusEffect(
+    React.useCallback(() => {
+      const reload = async () => {
+        const value = await SecureStore.getItemAsync("my-user-session");
+        if (value) {
+          const parsed = JSON.parse(value);
+          setUser(parsed); // ⭐ UPDATE AVATAR REALTIME
+        }
+      };
+      reload();
+    }, [])
+  );
+
+  /* --------------- LOAD FAVORITES --------------- */
   useEffect(() => {
     const loadFavorites = async () => {
-      try {
-        const saved = await SecureStore.getItemAsync("favorite-services");
-        setFavoriteServices(saved ? JSON.parse(saved) : []);
-      } catch {
-        setFavoriteServices([]);
-      }
+      const saved = await SecureStore.getItemAsync("favorite-services");
+      setFavoriteServices(saved ? JSON.parse(saved) : []);
     };
     loadFavorites();
   }, []);
 
-  /* ------------------------ TOGGLE FAVORITE ------------------------ */
+  /* --------------- TOGGLE FAVORITE --------------- */
   const toggleFavorite = async (id: number) => {
-    try {
-      const saved = await SecureStore.getItemAsync("favorite-services");
-      const current: number[] = saved ? JSON.parse(saved) : [];
+    const saved = await SecureStore.getItemAsync("favorite-services");
+    const current: number[] = saved ? JSON.parse(saved) : [];
 
-      let updated: number[] = [];
+    const updated = current.includes(id)
+      ? current.filter((f) => f !== id)
+      : [...current, id];
 
-      if (current.includes(id)) {
-        updated = current.filter((f: number) => f !== id);
-      } else {
-        updated = [...current, id];
-      }
-
-      setFavoriteServices(updated);
-
-      await SecureStore.setItemAsync("favorite-services", JSON.stringify(updated));
-
-      console.log("⭐ Favorite updated:", updated);
-
-    } catch (error) {
-      console.log("Favorite error:", error);
-    }
+    setFavoriteServices(updated);
+    await SecureStore.setItemAsync("favorite-services", JSON.stringify(updated));
   };
 
-  /* ------------------------ SEARCH ------------------------ */
+  /* --------------- SEARCH --------------- */
   const handleSearchSubmit = () => {
     if (!searchQuery.trim()) return;
     router.push({ pathname: "/search", params: { q: searchQuery } });
   };
 
-  /* ------------------------ RENDER SERVICE CARD ------------------------ */
+  /* --------------- RENDER SERVICE CARD --------------- */
   const renderServiceCard = ({ item }: { item: Service }) => {
     const isFav = favoriteServices.includes(item.id);
 
@@ -150,12 +151,16 @@ export default function HomeScreen() {
           <Image source={{ uri: item.image }} style={styles.serviceImage} />
 
           <View style={styles.serviceInfo}>
-            <Text style={styles.serviceName} numberOfLines={1}>{item.name}</Text>
-            <Text style={styles.serviceCategory}>Danh mục #{item.categoryId}</Text>
+            <Text style={styles.serviceName} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={styles.serviceCategory}>
+              Danh mục #{item.categoryId}
+            </Text>
 
             <View style={styles.serviceDetails}>
-              <View style={styles.ratingContainer}>
-                <Star size={14} color={colors.warning} fill={colors.warning} />
+              <View style={styles.ratingBadge}>
+                <Star size={12} color="#FBBF24" fill="#FBBF24" />
                 <Text style={styles.rating}>{item.rating}</Text>
                 <Text style={styles.reviewCount}>({item.reviewCount})</Text>
               </View>
@@ -168,8 +173,12 @@ export default function HomeScreen() {
 
             <View style={styles.priceContainer}>
               <Text style={styles.price}>
-                {Number(String(item.price).replace(/\D/g, "")).toLocaleString("vi-VN")}đ
+                {Number(String(item.price).replace(/\D/g, "")).toLocaleString(
+                  "vi-VN"
+                )}
+                đ
               </Text>
+
               <View style={styles.durationContainer}>
                 <Clock size={14} color="#9CA3AF" />
                 <Text style={styles.duration}>{item.duration}</Text>
@@ -178,7 +187,6 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* ❤️ icon yêu thích */}
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.favoriteIcon}
@@ -194,13 +202,10 @@ export default function HomeScreen() {
     );
   };
 
-  /* ------------------------ HEADER ------------------------ */
+  /* --------------- HEADER COMPONENT --------------- */
   const HeaderComponent = (
     <View>
-      <LinearGradient
-        colors={[colors.primary, colors.primaryAlt]}
-        style={styles.header}
-      >
+      <LinearGradient colors={["#FFE7C2", "#FFD08A"]} style={styles.header}>
         <View style={styles.headerContent}>
           <View>
             <Text style={styles.greeting}>Xin chào 👋</Text>
@@ -226,7 +231,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* SEARCH */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
             <Search size={20} color="#A1A1AA" />
@@ -244,6 +248,27 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* ICON GRID */}
+        <View style={styles.iconSection}>
+          {[
+            { icon: "🔥", label: "Deals" },
+            { icon: "🏬", label: "DashMart" },
+            { icon: "🍽", label: "Dining Out" },
+            { icon: "🛒", label: "Grocery" },
+            { icon: "🌮", label: "Mexican" },
+            { icon: "🍔", label: "Fast Food" },
+            { icon: "🍕", label: "Pizza" },
+            { icon: "🥣", label: "Soup" },
+          ].map((item, i) => (
+            <TouchableOpacity key={i} style={styles.iconTile}>
+              <View style={styles.iconGlass}>
+                <Text style={styles.iconEmoji}>{item.icon}</Text>
+              </View>
+              <Text style={styles.iconLabel}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </LinearGradient>
 
       <View style={[styles.section, styles.sectionHeader]}>
@@ -253,10 +278,6 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {servicesLoading && (
-        <ActivityIndicator color={colors.primaryAlt} style={{ marginTop: 30 }} />
-      )}
-
       {servicesError && (
         <Text style={[styles.errorText, { textAlign: "center" }]}>
           {servicesError}
@@ -264,6 +285,14 @@ export default function HomeScreen() {
       )}
     </View>
   );
+
+  if (servicesLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <HomeSkeleton />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -282,63 +311,147 @@ export default function HomeScreen() {
   );
 }
 
-/* ------------------------ STYLES ------------------------ */
+/* ========== STYLES ========== */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
+  container: {
+    flex: 1,
+    backgroundColor: "#F8F8F8",
+  },
 
   header: {
-    paddingTop: 16,
-    paddingBottom: 22,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
+    paddingTop: 50,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
   },
+
   headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 20,
   },
-  greeting: { fontSize: 14, color: "#FFFBE5" },
-  userName: { fontSize: 22, color: "#FFFFFF", fontWeight: "700" },
+
+  greeting: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+
+  userName: {
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    color: "#111827",
+  },
 
   avatarContainer: {
-    padding: 2,
-    backgroundColor: "#FFFFFF",
+    width: 48,
+    height: 48,
     borderRadius: 24,
+    backgroundColor: "#ffffff",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
   },
-  avatar: { width: 42, height: 42, borderRadius: 21 },
 
-  searchContainer: { marginTop: 8 },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+
+  searchContainer: { marginTop: 4 },
+
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: colors.text },
-  filterButton: {
-    padding: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.primaryLight,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
 
-  section: { paddingHorizontal: 20, marginTop: 20 },
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 15,
+    color: "#111827",
+  },
+
+  filterButton: {
+    padding: 8,
+    borderRadius: 14,
+    backgroundColor: "#FFF4D0",
+  },
+
+  iconSection: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginTop: 22,
+    paddingHorizontal: 10,
+    paddingBottom: 6,
+  },
+
+  iconTile: {
+    width: "23%",
+    alignItems: "center",
+    marginBottom: 22,
+  },
+
+  iconGlass: {
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+
+  iconEmoji: {
+    fontSize: 28,
+  },
+
+  iconLabel: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#374151",
+    textAlign: "center",
+  },
+
+  section: { paddingHorizontal: 20, marginTop: 18 },
+
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
   },
+
   sectionTitle: { fontSize: 18, fontWeight: "700", color: colors.text },
+
   seeAllText: { fontSize: 13, fontWeight: "600", color: colors.primaryDark },
 
   serviceRow: {
     justifyContent: "space-between",
-    marginBottom: 14,
+    marginBottom: 16,
     paddingHorizontal: 20,
   },
 
@@ -348,90 +461,98 @@ const styles = StyleSheet.create({
   },
 
   serviceCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: "#ffffff",
+    borderRadius: 22,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
-  serviceImage: { width: "100%", height: 120, resizeMode: "cover" },
-  serviceInfo: { padding: 10 },
+
+  serviceImage: {
+    width: "100%",
+    height: 130,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+  },
+
+  serviceInfo: { padding: 12 },
+
+  serviceName: { fontSize: 14, fontWeight: "700", color: colors.text },
+
+  serviceCategory: { fontSize: 12, color: colors.textMuted, marginTop: 4 },
+
+  serviceDetails: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+  },
+
+  ratingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF7E6",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+
+  rating: {
+    fontSize: 11,
+    fontWeight: "600",
+    marginLeft: 3,
+    color: colors.text,
+  },
+
+  reviewCount: {
+    fontSize: 11,
+    color: "#9CA3AF",
+    marginLeft: 2,
+  },
+
+  locationContainer: { flexDirection: "row", alignItems: "center" },
+
+  distance: { fontSize: 11, color: "#6B7280", marginLeft: 3 },
+
+  priceContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+  },
+
+  price: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#F59E0B",
+  },
+
+  durationContainer: { flexDirection: "row", alignItems: "center" },
+
+  duration: { fontSize: 11, color: "#6B7280", marginLeft: 4 },
 
   favoriteIcon: {
     position: "absolute",
     top: 10,
     right: 10,
     zIndex: 10,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: "rgba(255,255,255,0.95)",
     padding: 6,
     borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
   },
-
-  serviceName: { fontSize: 14, fontWeight: "700", color: colors.text },
-  serviceCategory: { fontSize: 12, color: colors.textMuted, marginTop: 3 },
-
-  serviceDetails: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 6,
-  },
-  ratingContainer: { flexDirection: "row", alignItems: "center" },
-  rating: { fontSize: 11, fontWeight: "600", marginLeft: 3, color: colors.text },
-  reviewCount: { fontSize: 11, color: colors.textMuted, marginLeft: 2 },
-  locationContainer: { flexDirection: "row", alignItems: "center" },
-  distance: { fontSize: 11, color: colors.textMuted, marginLeft: 3 },
-
-  priceContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-    alignItems: "center",
-  },
-  price: { fontSize: 15, fontWeight: "700", color: colors.primaryAlt },
-  durationContainer: { flexDirection: "row", alignItems: "center" },
-  duration: { fontSize: 11, color: colors.textMuted, marginLeft: 3 },
 
   errorText: {
     marginTop: 18,
     paddingHorizontal: 20,
     color: colors.danger,
     fontSize: 13,
-  },
-
-  /* CATEGORY */
-  categoryItem: {
-    alignItems: "center",
-    marginRight: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    width: 86,
-  },
-
-  categoryIcon: {
-    width: 46,
-    height: 46,
-    backgroundColor: colors.primaryLight,
-    borderRadius: 23,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-
-  categoryEmoji: { fontSize: 22 },
-
-  categoryName: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.text,
-    textAlign: "center",
   },
 });

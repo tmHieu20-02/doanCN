@@ -270,19 +270,25 @@ export default function LoginScreen() {
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        <LinearGradient colors={["#FFE9A3", "#FFE29B", "#FFD98A"]} style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {mode === "login" && "Đăng nhập để tiếp tục"}
-            {mode === "forgot" && "Quên mật khẩu"}
-            {mode === "register" && "Tạo tài khoản mới"}
-          </Text>
+        <View style={styles.headerContainer}>
+          <LinearGradient colors={["#FFE9A3", "#FFE29B", "#FFD98A"]} style={styles.header}>
+            {/* Animated Decorative Shapes */}
+            {/* keep header simple with title + image */}
 
-          <Image
-            source={require("../../assets/images/pig.png")}
-            style={styles.headerImage}
-            resizeMode="contain"
-          />
-        </LinearGradient>
+            {/* Main Content */}
+            <Text style={styles.headerTitle}>
+              {mode === "login" && "Đăng nhập để tiếp tục"}
+              {mode === "forgot" && "Quên mật khẩu"}
+              {mode === "register" && "Tạo tài khoản mới"}
+            </Text>
+
+            <Image
+              source={require("../../assets/images/Login-rafiki.png")}
+              style={styles.headerImage}
+              resizeMode="contain"
+            />
+          </LinearGradient>
+        </View>
 
         {/* ================== CONTENT ================== */}
         <View style={styles.formArea}>
@@ -771,12 +777,15 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFF" },
+  headerContainer: { position: 'relative', overflow: 'hidden' },
   header: {
     height: 280,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
     paddingTop: 50,
     alignItems: "center",
+    overflow: 'hidden',
+    position: 'relative',
   },
   headerTitle: { fontSize: 22, fontWeight: "800", color: "#333", marginBottom: 10 },
   headerImage: { width: "88%", height: 160 },

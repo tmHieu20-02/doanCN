@@ -12,10 +12,10 @@ interface UserSession {
   id: number;
   numberPhone: string;
   roleId: number;
-  full_name?: string | null;   // ✔ THÊM
-  gender?: string | null;      // ✔ THÊM
+  full_name?: string | null;
+  gender?: string | null;
   avatar?: string | null;
-  email?: string | null;       // ✔ THÊM
+  email?: string | null;
 }
 
 interface AuthResponse {
@@ -32,6 +32,7 @@ interface AuthContextData {
   signUp: (params: any) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  updateUser: (data: Partial<UserSession>) => Promise<void>;   // ⭐ giữ nguyên
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -41,23 +42,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // GIỮ NGUYÊN LOGIC CỦA BẠN
+  /* ===============================
+        LOAD USER LẦN ĐẦU
+  =============================== */
   useEffect(() => {
     const loadUser = async () => {
       try {
         const stored = await SecureStore.getItemAsync(USER_KEY);
-        if (stored) {
-          setUser(JSON.parse(stored));
-        }
+        if (stored) setUser(JSON.parse(stored));
       } finally {
         setIsInitialized(true);
       }
     };
-
     loadUser();
   }, []);
 
-  // GIỮ NGUYÊN LOGIC CỦA BẠN
+  /* ===============================
+        UPDATE USER (GIỮ LOGIC NGUYÊN)
+  =============================== */
+  const updateUser = async (data: Partial<UserSession>) => {
+    // update thẳng vào React Context
+    setUser((prev) => (prev ? { ...prev, ...data } : prev));
+
+    // update SecureStore
+    const stored = await SecureStore.getItemAsync(USER_KEY);
+    if (stored) {
+      const oldData = JSON.parse(stored);
+      const newData = { ...oldData, ...data };
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(newData));
+    }
+
+    // ❌ KHÔNG refreshUser() — vì nó sẽ load lại bản cũ và phá avatar mới
+    // await refreshUser();  ← xoá hoàn toàn dòng này
+  };
+
+  /* ===============================
+        SIGN IN
+  =============================== */
   const signIn = async ({
     numberPhone,
     password,
@@ -65,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     numberPhone: string;
     password: string;
   }): Promise<AuthResponse> => {
+
     setIsLoading(true);
     try {
       const res = await axios.post(`${BASE_URL}/login`, {
@@ -78,8 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!token) return { success: false, message: "Không tìm thấy token." };
 
       const decoded: any = jwtDecode(token);
-
-      // ✔ LẤY 3 TRƯỜNG BẠN MUỐN — KHÔNG ĐỤNG TỚI LOGIC
       const backendUser = res.data?.user || {};
 
       const session: UserSession = {
@@ -95,12 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(session));
       setUser(session);
 
-      // GIỮ NGUYÊN REDIRECT CỦA BẠN
-      if (session.roleId === 2) {
-        router.replace("/staff");
-      } else {
-        router.replace("/(tabs)");
-      }
+      if (session.roleId === 2) router.replace("/staff");
+      else router.replace("/(tabs)");
 
       return { success: true, data: session };
     } catch (err) {
@@ -115,7 +131,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // GIỮ NGUYÊN LOGIC CỦA BẠN
+  /* ===============================
+        SIGN UP
+  =============================== */
   const signUp = async (data: any) => {
     setIsLoading(true);
     try {
@@ -136,19 +154,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // GIỮ NGUYÊN LOGIC CỦA BẠN
+  /* ===============================
+        SIGN OUT
+  =============================== */
   const signOut = async () => {
     await SecureStore.deleteItemAsync(USER_KEY);
     setUser(null);
     router.replace("/(auth)/login");
   };
 
-  // GIỮ NGUYÊN LOGIC CỦA BẠN
+  /* ===============================
+        REFRESH USER
+  =============================== */
   const refreshUser = async () => {
     const stored = await SecureStore.getItemAsync(USER_KEY);
-    if (stored) {
-      setUser(JSON.parse(stored));
-    }
+    if (stored) setUser(JSON.parse(stored));
   };
 
   return (
@@ -161,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUp,
         signOut,
         refreshUser,
+        updateUser,  // ⭐ giữ nguyên
       }}
     >
       {children}

@@ -1,32 +1,37 @@
 // =======================
-// 🎨 PREMIUM SOFT-GOLD THEME
+// 🎨 SOFT ORANGE PREMIUM THEME (MATCH INDEX UI)
 // =======================
 
 export const colors = {
-  // 🎨 Vàng Soft-Gold premium
-  primary: '#F7C948',      // vàng dịu – dùng cho header
-  primaryDark: '#E8A200',  // vàng đậm – dùng cho button
-  primaryLight: '#FAEAB1', // vàng pastel nhẹ – dùng cho nền badge/filter
-  primaryAlt: '#F4D06F',   // vàng amber ấm – điểm nhấn
+  // PRIMARY GRADIENT (header)
+  primary: '#FFE7C2',     // vàng pastel nhạt – đầu gradient
+  primaryAlt: '#FFD08A',  // vàng cam nhẹ – cuối gradient
 
-  // Nền & card
-  bg: '#FFFDF7',           // nền cream sang trọng
-  card: '#FFFFFF',         // nền card trắng
+  // PRIMARY ACTION
+  primaryDark: '#F59E0B',   // vàng đậm – dùng cho text button "Xem tất cả", price
+  primaryLight: '#FFF4D0',  // vàng kem – dùng cho filter button, badge rating
 
-  // Text
+  // HEART ICON COLOR
+  accent: '#F97316',        // màu cam của biểu tượng favorite
+
+  // BACKGROUND
+  bg: '#F8F8F8',            // màu nền index
+  card: '#FFFFFF',          // background của service card + avatar background
+
+  // TEXT
   text: '#111827',
   textMuted: '#6B7280',
 
-  // Border / Divider
+  // BORDER
   border: '#E5E7EB',
 
-  // Trạng thái
+  // STATES
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',
 } as const;
 
-// Bo góc
+// RADII
 export const radius = {
   xs: 8,
   sm: 12,
@@ -35,16 +40,16 @@ export const radius = {
   xl: 24,
 } as const;
 
-// Shadow card
+// SHADOWS STATELY PREMIUM
 export const shadow = {
   card: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 5,
   },
 } as const;
 
-// Spacing helper
+// SPACING HELPER
 export const spacing = (n: number) => n * 4;

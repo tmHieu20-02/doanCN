@@ -13,7 +13,8 @@ import axios from "axios";
 import { cancelAllBookings as cancelAllService } from "../serviceId/bookingService";
 import * as SecureStore from "expo-secure-store";
 
-type BookingStatus = "" | "pending" | "confirmed" | "done" | "cancelled";
+// ✅ Thêm "completed" vào union
+type BookingStatus = "" | "pending" | "confirmed" | "completed" | "done" | "cancelled";
 
 export default function StaffBooking() {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -66,7 +67,7 @@ export default function StaffBooking() {
   // ==========================
   // 🔵 CONFIRM 1 BOOKING
   // ==========================
-  const confirmBooking = async (booking: any) => {
+  const confirmBooking = async (booking: any, nextStatus: "confirmed" | "completed") => {
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const token = JSON.parse(stored!).token;
@@ -77,7 +78,7 @@ export default function StaffBooking() {
         start_time: booking.start_time?.slice(0, 5),
         end_time: booking.end_time?.slice(0, 5),
         note: booking.note || "",
-        status: "confirmed",
+        status: nextStatus, // "confirmed" hoặc "completed"
       };
 
       await axios.put(
@@ -88,7 +89,7 @@ export default function StaffBooking() {
 
       fetchBookings({ silent: true });
     } catch (error: any) {
-      console.log("❌ Lỗi xác nhận:", error?.response?.data || error);
+      console.log("❌ Lỗi cập nhật:", error?.response?.data || error);
     }
   };
 
@@ -126,9 +127,11 @@ export default function StaffBooking() {
   // ==========================
   // 🔵 UI
   // ==========================
-  const renderStatusBadge = (status: string) => {
+  const renderStatusBadge = (statusRaw: string) => {
+    const status = (statusRaw || "").toLowerCase();
+
     let bg = "#6B7280";
-    let label = status;
+    let label = statusRaw;
 
     switch (status) {
       case "pending":
@@ -139,11 +142,13 @@ export default function StaffBooking() {
         bg = "#3B82F6";
         label = "Đã xác nhận";
         break;
+      case "completed":
       case "done":
         bg = "#10B981";
         label = "Hoàn tất";
         break;
       case "cancelled":
+      case "canceled":
         bg = "#EF4444";
         label = "Đã hủy";
         break;
@@ -166,7 +171,7 @@ export default function StaffBooking() {
     const price =
       item.service?.price || item.total_price || 0;
 
-    const status = item.status || "pending";
+    const status: string = item.status || "pending";
 
     return (
       <View style={styles.card}>
@@ -183,16 +188,26 @@ export default function StaffBooking() {
           {item.booking_date?.slice(0, 10)}
         </Text>
 
-        {status === "pending" && (
-          <View style={styles.actionRow}>
+        {/* Hành động theo trạng thái */}
+        <View style={styles.actionRow}>
+          {status === "pending" && (
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: "#2563EB" }]}
-              onPress={() => confirmBooking(item)}
+              onPress={() => confirmBooking(item, "confirmed")}
             >
               <Text style={styles.actionText}>Xác nhận</Text>
             </TouchableOpacity>
-          </View>
-        )}
+          )}
+
+          {status === "confirmed" && (
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: "#10B981" }]}
+              onPress={() => confirmBooking(item, "completed")}
+            >
+              <Text style={styles.actionText}>Hoàn tất</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   };
@@ -243,7 +258,7 @@ export default function StaffBooking() {
         {renderFilterButton("Tất cả", "")}
         {renderFilterButton("Chờ", "pending")}
         {renderFilterButton("Đã xác nhận", "confirmed")}
-        {renderFilterButton("Hoàn tất", "done")}
+        {renderFilterButton("Hoàn tất", "completed")}
         {renderFilterButton("Đã hủy", "cancelled")}
       </View>
 

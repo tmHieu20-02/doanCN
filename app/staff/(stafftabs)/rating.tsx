@@ -10,7 +10,6 @@ import {
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
-// Theme
 import { colors, shadow, radius, spacing } from "../../../ui/theme";
 
 export default function StaffRatings() {
@@ -24,10 +23,14 @@ export default function StaffRatings() {
 
       const res = await axios.get(
         "https://phatdat.store/api/v1/rating/get-staff",
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
 
-      const data = res.data?.data || [];
+      console.log("STAFF RATING RAW:", res.data);
+
+      const data = res.data?.date?.rows || [];      // ⭐ FIXED
       setRatings(data);
       setLoading(false);
     } catch (err) {
@@ -50,12 +53,14 @@ export default function StaffRatings() {
 
   const avgRating =
     ratings.length > 0
-      ? (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(1)
+      ? (
+          ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
+        ).toFixed(1)
       : "0.0";
 
   return (
     <ScrollView style={styles.container}>
-      {/* Tổng quan rating */}
+      {/* Tổng quan */}
       <View style={styles.summaryCard}>
         <Text style={styles.avgRating}>{avgRating}</Text>
         <Text style={styles.starText}>⭐</Text>
@@ -64,25 +69,31 @@ export default function StaffRatings() {
 
       {/* Danh sách đánh giá */}
       {ratings.length === 0 ? (
-        <Text style={{ textAlign: "center", marginTop: 40, color: colors.textMuted }}>
+        <Text
+          style={{
+            textAlign: "center",
+            marginTop: 40,
+            color: colors.textMuted,
+          }}
+        >
           Chưa có đánh giá nào
         </Text>
       ) : (
         ratings.map((item, index) => (
           <View key={index} style={styles.ratingItem}>
+            {/* Header */}
             <View style={styles.headerRow}>
-              <Image
-                source={{
-                  uri:
-                    item.customer?.avatar ||
-                    "https://i.pravatar.cc/150?img=" + (index + 1),
-                }}
-                style={styles.avatar}
-              />
+              {item.customer?.avatar ? (
+  <Image
+    source={{ uri: item.customer.avatar }}
+    style={styles.avatar}
+  />
+) : null}
+
 
               <View style={{ flex: 1 }}>
                 <Text style={styles.customerName}>
-                  {item.customer?.name || "Khách hàng"}
+                  {item.customer?.full_name || "Khách hàng"}   {/* ⭐ FIXED */}
                 </Text>
                 <Text style={styles.timeText}>
                   {new Date(item.createdAt).toLocaleDateString("vi-VN")}
@@ -92,7 +103,17 @@ export default function StaffRatings() {
               <Text style={styles.ratingNumber}>⭐ {item.rating}</Text>
             </View>
 
+            {/* Nội dung đánh giá */}
             <Text style={styles.commentText}>{item.comment}</Text>
+
+            {/* Gợi ý thông tin dịch vụ */}
+            <Text style={styles.serviceText}>
+              Dịch vụ: {item.service?.name}
+            </Text>
+            <Text style={styles.serviceText}>
+              Ngày thực hiện:{" "}
+              {new Date(item.booking?.booking_date).toLocaleDateString("vi-VN")}
+            </Text>
           </View>
         ))
       )}
@@ -171,7 +192,6 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 13,
     color: colors.textMuted,
-    marginTop: 2,
   },
 
   ratingNumber: {
@@ -184,5 +204,11 @@ const styles = StyleSheet.create({
     marginTop: spacing(1),
     fontSize: 15,
     color: colors.text,
+  },
+
+  serviceText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: 6,
   },
 });
