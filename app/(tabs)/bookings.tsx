@@ -1,3 +1,7 @@
+// ===========================================================
+// BOOKING SCREEN FINAL WITH RE-BOOK BUTTON
+// ===========================================================
+
 import React, { useState, useCallback } from 'react';
 import {
   View,
@@ -64,7 +68,7 @@ type BookingTab = {
 
 type Booking = {
   id: number;
-  serviceId: number;            // ⭐ thêm để truyền rating
+  serviceId: number;
   serviceName: string;
   serviceType: string;
   date: string;
@@ -109,7 +113,7 @@ export default function BookingsScreen() {
       }
 
       const res = await api.get('/booking/get-all');
-      const list = res.data.bookings || res.data.data || [];
+      const list = res.data.bookings || [];
 
       const userBookings = list.filter((b: any) => b.user_id === userId);
 
@@ -122,7 +126,7 @@ export default function BookingsScreen() {
 
         const booking: Booking = {
           id: item.id,
-          serviceId: item.service?.id,    // ⭐ thêm đúng từ API
+          serviceId: item.service?.id,
           serviceName: item.service?.name || 'Dịch vụ',
           serviceType: item.service?.category_name || 'Không có danh mục',
           date: item.booking_date ? String(item.booking_date).slice(0, 10) : '',
@@ -134,7 +138,7 @@ export default function BookingsScreen() {
           canCancel: true,
         };
 
-        if (['cancelled', 'rejected', 'bom'].includes(booking.status)) {
+        if (['canceled', 'cancelled', 'rejected', 'bom'].includes(booking.status)) {
           can.push(booking);
         } else if (['completed', 'done'].includes(booking.status)) {
           com.push(booking);
@@ -171,52 +175,50 @@ export default function BookingsScreen() {
   /* Cancel booking API */
   /* ------------------------------------ */
   const handleCancelBooking = (bookingId: number) => {
-  Alert.alert("Xác nhận hủy lịch", "Bạn có chắc chắn muốn hủy lịch hẹn này?", [
-    { text: "Không", style: "cancel" },
-    {
-      text: "Hủy lịch",
-      style: "destructive",
-      onPress: async () => {
-        try {
-          const res = await api.post(`/booking/cancel/${bookingId}`, {
-            cancel_note: "Người dùng đã hủy lịch",
-          });
+    Alert.alert(
+      "Xác nhận hủy lịch",
+      "Bạn có chắc chắn muốn hủy lịch hẹn này?",
+      [
+        { text: "Không", style: "cancel" },
+        {
+          text: "Hủy lịch",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const res = await api.post(`/booking/cancel/${bookingId}`, {
+                cancel_note: "Người dùng đã hủy lịch",
+              });
 
-          console.log("CANCEL RESPONSE:", res.data);
-
-          if (res.data?.err === 0) {
-            Alert.alert("Thành công", "Đã hủy lịch hẹn.");
-            onRefresh();
-          } else {
-            Alert.alert("Lỗi", res.data?.mes || "Không thể hủy lịch.");
-          }
-        } catch (error: any) {
-          console.log(
-            "CANCEL ERROR:",
-            error?.response?.data || error.message || error
-          );
-
-          Alert.alert(
-            "Lỗi",
-            error?.response?.data?.mes ||
-              "Không thể hủy lịch hẹn. Vui lòng thử lại."
-          );
-        }
-      },
-    },
-  ]);
-};
-
+              if (res.data?.err === 0) {
+                Alert.alert("Thành công", "Đã hủy lịch hẹn.");
+                setActiveTab("cancelled");
+                onRefresh();
+              } else {
+                Alert.alert("Lỗi", res.data?.mes || "Không thể hủy lịch.");
+              }
+            } catch (error: any) {
+              Alert.alert(
+                "Lỗi",
+                error?.response?.data?.mes ||
+                "Không thể hủy lịch hẹn. Vui lòng thử lại."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
 
   /* ------------------------------------ */
   /* Helpers */
-/* ------------------------------------ */
+  /* ------------------------------------ */
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'confirmed':
         return { bg: '#DCFCE7', text: colors.success, label: 'Đã xác nhận' };
       case 'pending':
         return { bg: '#FEF3C7', text: colors.warning, label: 'Chờ xác nhận' };
+      case 'canceled':
       case 'cancelled':
       case 'rejected':
       case 'bom':
@@ -257,23 +259,13 @@ export default function BookingsScreen() {
         style={[styles.tabButton, isActive && styles.tabButtonActive]}
         onPress={() => setActiveTab(item.id)}
       >
-        <Text
-          style={[
-            styles.tabButtonText,
-            isActive && styles.tabButtonTextActive,
-          ]}
-        >
+        <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
           {item.name}
         </Text>
 
         {item.count > 0 && (
           <View style={[styles.tabBadge, isActive && styles.tabBadgeActive]}>
-            <Text
-              style={[
-                styles.tabBadgeText,
-                isActive && styles.tabBadgeTextActive,
-              ]}
-            >
+            <Text style={[styles.tabBadgeText, isActive && styles.tabBadgeTextActive]}>
               {item.count}
             </Text>
           </View>
@@ -284,7 +276,7 @@ export default function BookingsScreen() {
 
   /* ------------------------------------ */
   /* Render Booking Item */
-/* ------------------------------------ */
+  /* ------------------------------------ */
   const renderBookingItem = ({ item }: { item: Booking }) => {
     const statusStyle = getStatusStyle(item.status);
 
@@ -334,6 +326,7 @@ export default function BookingsScreen() {
               <MessageCircle size={18} color={colors.primaryDark} />
             </TouchableOpacity>
 
+            {/* Cancel Button */}
             {activeTab === 'upcoming' && item.canCancel && (
               <TouchableOpacity
                 style={styles.cancelButton}
@@ -343,23 +336,33 @@ export default function BookingsScreen() {
               </TouchableOpacity>
             )}
 
-            {/* ⭐ Completed → Rating */}
+            {/* Rating Button */}
             {activeTab === 'completed' && (
               <TouchableOpacity
                 style={styles.ratingButton}
                 onPress={() =>
                   router.push({
                     pathname: '/rating/create',
-                    params: {
-                      serviceId: item.serviceId,     // ⭐ fixed
-                      bookingId: item.id,
-                    },
+                    params: { serviceId: item.serviceId, bookingId: item.id },
                   })
                 }
               >
                 <Text style={styles.ratingButtonText}>Đánh giá</Text>
               </TouchableOpacity>
             )}
+
+            {/* ⭐ RE-BOOK BUTTON ADDED HERE ⭐ */}
+            {activeTab === 'cancelled' && (
+              <TouchableOpacity
+                style={styles.rebookButton}
+                onPress={() =>
+                  router.push(`/service/${item.serviceId}?rebook=1`)
+                }
+              >
+                <Text style={styles.rebookButtonText}>Đặt lại</Text>
+              </TouchableOpacity>
+            )}
+
           </View>
         </View>
       </View>
@@ -370,12 +373,11 @@ export default function BookingsScreen() {
 
   /* ------------------------------------ */
   /* UI */
-/* ------------------------------------ */
+  /* ------------------------------------ */
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
 
-      {/* Header */}
       <LinearGradient
         colors={[colors.primary, colors.primaryAlt]}
         style={styles.header}
@@ -384,7 +386,6 @@ export default function BookingsScreen() {
         <Text style={styles.headerSubtitle}>Quản lý và theo dõi lịch hẹn</Text>
       </LinearGradient>
 
-      {/* Tabs */}
       <View style={styles.tabsContainer}>
         <FlatList
           data={bookingTabs}
@@ -392,17 +393,11 @@ export default function BookingsScreen() {
           keyExtractor={(item) => item.id}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabsList}
         />
       </View>
 
-      {/* Content */}
       {loading ? (
-        <ActivityIndicator
-          size="large"
-          color={colors.primary}
-          style={{ marginTop: 50 }}
-        />
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
       ) : currentBookings.length > 0 ? (
         <FlatList
           data={currentBookings}
@@ -425,15 +420,15 @@ export default function BookingsScreen() {
             activeTab === 'upcoming'
               ? 'Không có lịch hẹn sắp tới'
               : activeTab === 'completed'
-              ? 'Chưa có lịch hẹn hoàn thành'
-              : 'Không có lịch hẹn bị hủy'
+                ? 'Chưa có lịch hẹn hoàn thành'
+                : 'Không có lịch hẹn bị hủy'
           }
           subtitle={
             activeTab === 'upcoming'
               ? 'Đặt lịch hẹn đầu tiên của bạn ngay thôi!'
               : activeTab === 'completed'
-              ? 'Hoàn thành một dịch vụ để xem lịch sử'
-              : 'Tuyệt vời! Bạn chưa hủy lịch hẹn nào'
+                ? 'Hoàn thành một dịch vụ để xem lịch sử'
+                : 'Tuyệt vời! Bạn chưa hủy lịch hẹn nào'
           }
           buttonText={activeTab === 'upcoming' ? 'Đặt lịch ngay' : undefined}
           onPress={activeTab === 'upcoming' ? handleBookNow : undefined}
@@ -473,19 +468,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: -30,
     padding: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
     ...shadow.card,
     marginBottom: 24,
   },
-  tabsList: {}, 
-  
 
   tabButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderRadius: radius.lg,
@@ -506,7 +495,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    marginLeft: 4,
+    marginLeft: 6,
   },
   tabBadgeActive: {
     backgroundColor: 'rgba(255,255,255,0.4)',
@@ -534,6 +523,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.03)',
   },
+
   bookingHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -634,6 +624,20 @@ const styles = StyleSheet.create({
     color: '#B45309',
   },
 
+  /* ⭐ BUTTON ĐẶT LẠI ⭐ */
+  rebookButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    backgroundColor: '#E0F2FE',
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  rebookButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0369A1',
+  },
+
   emptyWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -667,3 +671,4 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
 });
+

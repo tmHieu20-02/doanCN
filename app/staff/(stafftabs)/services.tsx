@@ -8,7 +8,6 @@ import {
   FlatList,
   RefreshControl,
   Image,
-  Pressable,
 } from "react-native";
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
@@ -21,54 +20,29 @@ export default function StaffServices() {
   const { reload } = useLocalSearchParams();
 
   const [services, setServices] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  /** 🔵 FETCH CATEGORY */
-  const fetchCategories = async () => {
-    try {
-      const stored = await SecureStore.getItemAsync("my-user-session");
-      const token = stored ? JSON.parse(stored).token : null;
-
-      const res = await axios.get("https://phatdat.store/api/v1/category/get-all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setCategories(res.data?.data || []);
-    } catch (err: any) {
-      console.log("Lỗi lấy category:", err?.response?.data || err);
-    }
-  };
-
-  /** 🔵 FETCH SERVICES */
+  /** FETCH SERVICES */
   const fetchServices = async () => {
     try {
       setLoading(true);
-
       const stored = await SecureStore.getItemAsync("my-user-session");
-      const token = JSON.parse(stored!).token;
-
-      const params: any = {};
-      if (selectedCategory) params.categoryId = selectedCategory;
+      const token = stored ? JSON.parse(stored).token : null;
 
       const res = await axios.get("https://phatdat.store/api/v1/service/get-all", {
         headers: { Authorization: `Bearer ${token}` },
-        params,
       });
 
       setServices(res.data?.data || []);
-    } catch (err: any) {
-      console.log("Lỗi lấy dịch vụ:", err?.response?.data || err);
+    } catch (err) {
+      console.log("Lỗi lấy dịch vụ:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCategories();
     fetchServices();
   }, []);
 
@@ -76,17 +50,13 @@ export default function StaffServices() {
     if (reload) fetchServices();
   }, [reload]);
 
-  useEffect(() => {
-    fetchServices();
-  }, [selectedCategory]);
-
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchServices();
     setRefreshing(false);
   };
 
-  /** 🔵 SERVICE CARD */
+  /** SERVICE CARD */
   function ServiceCard({ item }: { item: any }) {
     const [imgFailed, setImgFailed] = useState(false);
     const placeholder = require("../../../assets/images/01.png");
@@ -95,14 +65,13 @@ export default function StaffServices() {
     return (
       <TouchableOpacity
         style={styles.card}
-        // ✔ FIX ROUTER — chỉ thay dòng này, không đổi logic
+        activeOpacity={0.88}
         onPress={() =>
           router.push({
-            pathname: "../serviceId/[id]",  // MOVE OUT OF (stafftabs)
+            pathname: "../serviceId/[id]",
             params: { id: item.id },
           })
         }
-        activeOpacity={0.88}
       >
         <View style={styles.cardInner}>
           <View style={styles.thumbWrap}>
@@ -112,14 +81,14 @@ export default function StaffServices() {
               onError={() => setImgFailed(true)}
             />
 
-            {item?.image && !imgFailed ? (
+            {item.image && !imgFailed && (
               <LinearGradient
-                colors={["rgba(255,255,255,0.06)", "rgba(0,0,0,0.16)"]}
+                colors={["rgba(255,255,255,0.05)", "rgba(0,0,0,0.2)"]}
                 style={styles.featuredBadge}
               >
                 <Text style={styles.featuredText}>Featured</Text>
               </LinearGradient>
-            ) : null}
+            )}
           </View>
 
           <View style={styles.contentWrap}>
@@ -127,14 +96,17 @@ export default function StaffServices() {
               <Text style={styles.cardTitle} numberOfLines={1}>
                 {item.name}
               </Text>
+
               <View style={styles.durationPill}>
-                <Text style={styles.durationText}>{item.duration_minutes} phút</Text>
+                <Text style={styles.durationText}>
+                  {item.duration_minutes} phút
+                </Text>
               </View>
             </View>
 
-            {item.category?.name ? (
+            {item.category?.name && (
               <Text style={styles.cardCategory}>{item.category.name}</Text>
-            ) : null}
+            )}
 
             <Text style={styles.cardDescription} numberOfLines={2}>
               {item.description}
@@ -147,11 +119,8 @@ export default function StaffServices() {
 
               <TouchableOpacity
                 style={styles.editLink}
-                onPress={(e: any) => {
-                  try {
-                    e?.stopPropagation?.();
-                  } catch {}
-                  // ✔ ALSO FIX THIS ROUTE — same logic
+                onPress={(e) => {
+                  e.stopPropagation?.();
                   router.push({
                     pathname: "../serviceId/[id]",
                     params: { id: item.id },
@@ -182,48 +151,21 @@ export default function StaffServices() {
     <View style={styles.container}>
       {/* HEADER */}
       <View style={styles.headerRow}>
-        <View style={styles.headerCard}>
+        <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Quản lý dịch vụ</Text>
-          <Text style={styles.headerSubtitle}>Danh sách dịch vụ hiện có — chất lượng VIP</Text>
-          <Text style={styles.headerStat}>{services.length} dịch vụ</Text>
+          <Text style={styles.headerSubtitle}>
+            {services.length} dịch vụ đang hoạt động
+          </Text>
         </View>
 
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => router.push("/staff/serviceId/create")}
         >
-          <Plus size={18} color="#fff" />
+          <Plus size={16} color="#fff" />
           <Text style={styles.addButtonText}>Tạo mới</Text>
         </TouchableOpacity>
       </View>
-
-      {/* CATEGORY FILTER */}
-      <FlatList
-        horizontal
-        data={[{ id: null, name: "Tất cả" }, ...categories]}
-        keyExtractor={(item) => String(item.id)}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterList}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.filterItem,
-              selectedCategory === item.id && styles.filterItemActive,
-            ]}
-            onPress={() => setSelectedCategory(item.id)}
-            activeOpacity={0.8}
-          >
-            <Text
-              style={[
-                styles.filterItemText,
-                selectedCategory === item.id && styles.filterItemTextActive,
-              ]}
-            >
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
 
       {/* SERVICE LIST */}
       <FlatList
@@ -232,7 +174,9 @@ export default function StaffServices() {
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 30 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Text style={styles.emptyText}>Không có dịch vụ nào</Text>
@@ -243,112 +187,105 @@ export default function StaffServices() {
   );
 }
 
-/* ======================= STYLES ======================= */
-
+/* STYLES */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F6F6F8",
-    padding: 16,
+    backgroundColor: "#F2F3F7",
+    paddingHorizontal: 16,
+    paddingTop: 4,
   },
+
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 18,
+    marginTop: 6,
   },
+
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#222",
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#111",
   },
+
   headerSubtitle: {
     fontSize: 13,
-    color: "#777",
-    marginTop: 2,
-  },
-  headerCard: {
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 14,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    marginRight: 12,
-  },
-  headerStat: {
-    marginTop: 8,
-    fontSize: 13,
     color: "#6B7280",
-    fontWeight: "600",
+    marginTop: 4,
   },
+
   addButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFB300",
+    backgroundColor: "#000",
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,
-    elevation: 2,
-  },
-  addButtonText: {
-    color: "white",
-    fontWeight: "600",
-    marginLeft: 6,
-    fontSize: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
 
-  filterList: {
-    paddingVertical: 4,
-    marginBottom: 16,
-  },
-  filterItem: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 20,
-    marginRight: 8,
-    backgroundColor: "#fff",
-  },
-  filterItemActive: {
-    backgroundColor: "#FFB300",
-    borderColor: "#FFB300",
-  },
-  filterItemText: {
-    fontSize: 13,
-    color: "#444",
-  },
-  filterItemTextActive: {
+  addButtonText: {
     color: "#fff",
-    fontWeight: "600",
+    fontWeight: "700",
+    marginLeft: 6,
+    fontSize: 13,
   },
 
   card: {
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 12,
-    elevation: 3,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+    borderRadius: 18,
+    marginBottom: 14,
     shadowColor: "#000",
     shadowOpacity: 0.07,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
   },
-  cardInner: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+
+  cardInner: {
+    flexDirection: "row",
+    gap: 14,
+    alignItems: "flex-start",
+  },
+
   thumbWrap: {
-    width: 92,
-    height: 92,
-    borderRadius: 12,
+    width: 100,
+    height: 100,
+    borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#F3F4F6",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "#E5E7EB",
   },
-  thumb: { width: "100%", height: "100%", resizeMode: "cover" },
-  contentWrap: { flex: 1 },
+
+  thumb: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+
+  featuredBadge: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+
+  featuredText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  contentWrap: {
+    flex: 1,
+  },
+
   titleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -356,75 +293,77 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 
-  durationPill: {
-    backgroundColor: "#EEF2FF",
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  durationText: { color: "#1E3A8A", fontSize: 12, fontWeight: "700" },
-
   cardTitle: {
     fontSize: 17,
     fontWeight: "800",
     color: "#111827",
     flex: 1,
-    marginRight: 10,
+  },
+
+  durationPill: {
+    backgroundColor: "#FFF7ED",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+
+  durationText: {
+    color: "#D97706",
+    fontSize: 12,
+    fontWeight: "700",
   },
 
   cardCategory: {
     fontSize: 12,
-    color: "#0ea5e9",
+    color: "#2563EB",
     fontWeight: "700",
     marginBottom: 6,
   },
+
   cardDescription: {
     fontSize: 13,
     color: "#4B5563",
     marginBottom: 8,
   },
+
   metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: 6,
   },
+
   cardPrice: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0f172a",
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#111827",
   },
+
   editLink: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: "#EFF6FF",
   },
-  editText: { color: "#1E3A8A", fontWeight: "700" },
 
-  featuredBadge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  featuredText: {
-    color: "#fff",
-    fontSize: 11,
+  editText: {
+    color: "#2563EB",
     fontWeight: "700",
-    letterSpacing: 0.3,
   },
 
   emptyBox: {
-    alignItems: "center",
     marginTop: 30,
-  },
-  emptyText: {
-    color: "#777",
-    fontSize: 14,
+    alignItems: "center",
   },
 
-  loadingBox: { flex: 1, justifyContent: "center", alignItems: "center" },
+  emptyText: {
+    color: "#6B7280",
+    fontSize: 15,
+  },
+
+  loadingBox: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });

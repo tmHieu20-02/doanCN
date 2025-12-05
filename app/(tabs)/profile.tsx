@@ -81,9 +81,9 @@ export default function ProfileScreen() {
       if (stored) {
         const data = JSON.parse(stored);
 
-       if (user && data.full_name) {
-  user.full_name = data.full_name;
-}
+        if (user && data.full_name) {
+          user.full_name = data.full_name;
+        }
 
         if (data.avatar) setAvatarUrl(data.avatar);
       }
@@ -105,39 +105,39 @@ export default function ProfileScreen() {
     );
   };
 
-const handleChangeAvatar = async () => {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!permission.granted) {
-    alert("Cần quyền truy cập thư viện ảnh.");
-    return;
-  }
+  const handleChangeAvatar = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      alert("Cần quyền truy cập thư viện ảnh.");
+      return;
+    }
 
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    quality: 0.7,
-  });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
 
-  if (result.canceled) return;
+    if (result.canceled) return;
 
-  const imageUri = result.assets[0].uri;
+    const imageUri = result.assets[0].uri;
 
-  // Cập nhật UI ngay lập tức
-  setAvatarUrl(imageUri);
+    // Cập nhật UI ngay lập tức
+    setAvatarUrl(imageUri);
 
-  // Lưu avatar mới vào session
-  const stored = await SecureStore.getItemAsync("my-user-session");
-  if (stored) {
-    const session = JSON.parse(stored);
-    session.avatar = imageUri;
-    await SecureStore.setItemAsync("my-user-session", JSON.stringify(session));
-  }
+    // Lưu avatar mới vào session
+    const stored = await SecureStore.getItemAsync("my-user-session");
+    if (stored) {
+      const session = JSON.parse(stored);
+      session.avatar = imageUri;
+      await SecureStore.setItemAsync("my-user-session", JSON.stringify(session));
+    }
 
-  // ⚡ Thông báo ngay lập tức (không chờ upload)
-  alert("Cập nhật ảnh đại diện thành công!");
+    // ⚡ Thông báo ngay lập tức (không chờ upload)
+    alert("Cập nhật ảnh đại diện thành công!");
 
-  // ⚙ Upload chạy nền, không block UI
-  uploadAvatar(imageUri).catch(() => {});
-};
+    // ⚙ Upload chạy nền, không block UI
+    uploadAvatar(imageUri).catch(() => { });
+  };
 
   /* ================================ RENDER ================================ */
 
@@ -160,7 +160,7 @@ const handleChangeAvatar = async () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-        
+
         {/* HEADER */}
         <LinearGradient colors={[colors.primary, colors.primaryAlt]} style={styles.header}>
           <View style={styles.headerTopRow}>
@@ -207,17 +207,18 @@ const handleChangeAvatar = async () => {
                 {section.items.map((item, index) => (
                   <TouchableOpacity
                     key={item.id}
-                    onPress={() => {
-                     if (item.id === "edit-profile") {
-  router.push("/profile/edit");
-}
+                   onPress={() => {
+  if (item.id === "edit-profile") {
+    router.push("/profile/edit");
+  }
 
-if (item.id === "favorites") {
-  router.push("/profile/favorites");
-}
+  if (item.id === "favorites") {
+    router.push("../favorite");
 
 
-                    }}
+  }
+}}
+
                     style={[
                       styles.menuItem,
                       index === section.items.length - 1 && styles.menuItemLast,

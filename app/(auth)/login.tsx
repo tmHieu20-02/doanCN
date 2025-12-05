@@ -892,4 +892,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2A2A2A',
   },
+  
 });

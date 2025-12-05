@@ -9,14 +9,14 @@ import {
   FlatList,
   SafeAreaView,
 } from "react-native";
+
 import { LinearGradient } from "expo-linear-gradient";
 import { Search, MapPin, Star, Clock, Filter, Heart } from "lucide-react-native";
-import { router, useFocusEffect } from "expo-router"; // ⭐ THÊM
+import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+
 import { useCategories } from "../../hooks/useCategories";
 import { colors } from "@/ui/theme";
-
-// Skeleton
 import HomeSkeleton from "../../components/common/skeletons/HomeSkeleton";
 
 export type Service = {
@@ -38,16 +38,15 @@ export default function HomeScreen() {
   const { categories } = useCategories();
   const [services, setServices] = useState<Service[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
-  const [servicesError, setServicesError] = useState("");
 
   const [favoriteServices, setFavoriteServices] = useState<number[]>([]);
 
-  /* --------------- LOAD SERVICES --------------- */
+  /* ============================================
+     LOAD SERVICES
+  ============================================ */
   useEffect(() => {
-    const fetchServices = async () => {
+    const loadServices = async () => {
       try {
-        setServicesLoading(true);
-
         const session = await SecureStore.getItemAsync("my-user-session");
         const token = session ? JSON.parse(session).token : null;
 
@@ -57,34 +56,43 @@ export default function HomeScreen() {
 
         const json = await res.json();
 
-        const mapped = (json.data || [])
-          .filter((s: any) => s && s.id)
-          .map((s: any) => ({
-            id: s.id,
-            name: s.name || "Dịch vụ",
-            description: s.description || "",
-            image: s.image || "https://picsum.photos/400",
-            price: s.price || 0,
-            duration: `${s.duration_minutes || 30} phút`,
-            categoryId: s.category_id || 0,
-            rating: 4.8,
-            reviewCount: 100,
-          }));
+        const mapped = (json.data || []).map((s: any) => ({
+          id: s.id,
+          name: s.name || "Dịch vụ",
+          description: s.description || "",
+          image: s.image || "https://picsum.photos/400",
+          price: Number(s.price || 0),
+          duration: `${s.duration_minutes ?? 30} phút`,
+          categoryId: s.category_id ?? 0,
+          rating: 4.8,
+          reviewCount: 100,
+        }));
 
         setServices(mapped);
-      } catch (e) {
-        setServicesError("Không thể tải dịch vụ.");
       } finally {
-        setTimeout(() => {
-          setServicesLoading(false);
-        }, 800);
+        setTimeout(() => setServicesLoading(false), 600);
       }
     };
 
-    fetchServices();
+    loadServices();
   }, []);
 
-  /* --------------- LOAD USER ONCE --------------- */
+  /* ============================================
+     LOAD USER INFO
+  ============================================ */
+  useEffect(() => {
+  const debug = async () => {
+    const session = await SecureStore.getItemAsync("my-user-session");
+    console.log("SESSION RAW:", session);
+
+    if (session) {
+      const json = JSON.parse(session);
+      console.log("TOKEN:", json.token);
+    }
+  };
+  debug();
+}, []);
+
   useEffect(() => {
     const loadUserInfo = async () => {
       const value = await SecureStore.getItemAsync("my-user-session");
@@ -93,49 +101,129 @@ export default function HomeScreen() {
     loadUserInfo();
   }, []);
 
-  /* --------------- AUTO REFRESH USER WHEN HOME FOCUSED --------------- */
   useFocusEffect(
     React.useCallback(() => {
       const reload = async () => {
         const value = await SecureStore.getItemAsync("my-user-session");
-        if (value) {
-          const parsed = JSON.parse(value);
-          setUser(parsed); // ⭐ UPDATE AVATAR REALTIME
-        }
+        if (value) setUser(JSON.parse(value));
       };
       reload();
     }, [])
   );
 
-  /* --------------- LOAD FAVORITES --------------- */
+  /* ============================================
+     LOAD FAVORITES — FIXED JSON
+  ============================================ */
+  const loadFavorites = async () => {
+    try {
+      const session = await SecureStore.getItemAsync("my-user-session");
+      const token = session ? JSON.parse(session).token : null;
+
+      const res = await fetch("https://phatdat.store/api/v1/favorite/get-all", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const json = await res.json();
+
+      if (json.err === 0) {
+        const ids = json.data.map((f: any) => f.service_id);
+        setFavoriteServices(ids);
+      }
+    } catch (err) {
+      console.log("LOAD FAVORITES ERROR:", err);
+    }
+  };
+
   useEffect(() => {
-    const loadFavorites = async () => {
-      const saved = await SecureStore.getItemAsync("favorite-services");
-      setFavoriteServices(saved ? JSON.parse(saved) : []);
-    };
     loadFavorites();
   }, []);
 
-  /* --------------- TOGGLE FAVORITE --------------- */
-  const toggleFavorite = async (id: number) => {
-    const saved = await SecureStore.getItemAsync("favorite-services");
-    const current: number[] = saved ? JSON.parse(saved) : [];
+  useFocusEffect(
+    React.useCallback(() => {
+      loadFavorites();
+    }, [])
+  );
 
-    const updated = current.includes(id)
-      ? current.filter((f) => f !== id)
-      : [...current, id];
+  /* ============================================
+     FAVORITE API
+  ============================================ */
+  const addFavorite = async (service_id: number) => {
+    const session = await SecureStore.getItemAsync("my-user-session");
+    const token = session ? JSON.parse(session).token : null;
 
-    setFavoriteServices(updated);
-    await SecureStore.setItemAsync("favorite-services", JSON.stringify(updated));
+    const res = await fetch("https://phatdat.store/api/v1/favorite/create", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ service_id }),
+    });
+
+    return await res.json();
   };
 
-  /* --------------- SEARCH --------------- */
+   /* ============================================
+     REMOVE FAVORITE 
+  ============================================ */
+
+ const removeFavorite = async (service_id: number) => {
+  const session = await SecureStore.getItemAsync("my-user-session");
+  const token = session ? JSON.parse(session).token : null;
+
+  const res = await fetch(
+    `https://phatdat.store/api/v1/favorite/delete/${service_id}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ service_id }),
+    }
+  );
+
+  const resJson = await res.json();
+  console.log("DELETE RESPONSE:", resJson);
+  return resJson;
+};
+
+
+
+  /* ============================================
+     TOGGLE FAVORITE (OPTIMISTIC UI)
+  ============================================ */
+  const toggleFavorite = async (id: number) => {
+    const isFav = favoriteServices.includes(id);
+
+    // Optimistic update
+    setFavoriteServices((prev) =>
+      isFav ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+
+    let res;
+    if (isFav) res = await removeFavorite(id);
+    else res = await addFavorite(id);
+
+    if (res.err !== 0) {
+      // rollback UI nếu thất bại
+      setFavoriteServices((prev) =>
+        isFav ? [...prev, id] : prev.filter((x) => x !== id)
+      );
+    }
+  };
+
+  /* ============================================
+     SEARCH
+  ============================================ */
   const handleSearchSubmit = () => {
     if (!searchQuery.trim()) return;
     router.push({ pathname: "/search", params: { q: searchQuery } });
   };
 
-  /* --------------- RENDER SERVICE CARD --------------- */
+  /* ============================================
+     SERVICE CARD
+  ============================================ */
   const renderServiceCard = ({ item }: { item: Service }) => {
     const isFav = favoriteServices.includes(item.id);
 
@@ -173,10 +261,7 @@ export default function HomeScreen() {
 
             <View style={styles.priceContainer}>
               <Text style={styles.price}>
-                {Number(String(item.price).replace(/\D/g, "")).toLocaleString(
-                  "vi-VN"
-                )}
-                đ
+                {item.price.toLocaleString("vi-VN")} đ
               </Text>
 
               <View style={styles.durationContainer}>
@@ -187,6 +272,7 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
+        {/* Heart icon */}
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.favoriteIcon}
@@ -202,8 +288,40 @@ export default function HomeScreen() {
     );
   };
 
-  /* --------------- HEADER COMPONENT --------------- */
-  const HeaderComponent = (
+  /* ============================================
+     UI RENDER
+  ============================================ */
+
+  if (servicesLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <HomeSkeleton />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <FlatList
+        data={services}
+        renderItem={renderServiceCard}
+        keyExtractor={(item) => item.id.toString()}
+        numColumns={2}
+        showsVerticalScrollIndicator={false}
+        columnWrapperStyle={styles.serviceRow}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        ListHeaderComponent={<Header user={user} searchQuery={searchQuery} setSearchQuery={setSearchQuery} handleSearchSubmit={handleSearchSubmit} />}
+      />
+    </SafeAreaView>
+  );
+}
+
+/* ============================
+   🔥 HEADER COMPONENT TÁCH RIÊNG
+============================ */
+
+function Header({ user, searchQuery, setSearchQuery, handleSearchSubmit }: any) {
+  return (
     <View>
       <LinearGradient colors={["#FFE7C2", "#FFD08A"]} style={styles.header}>
         <View style={styles.headerContent}>
@@ -231,6 +349,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* SEARCH */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
             <Search size={20} color="#A1A1AA" />
@@ -248,27 +367,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* ICON GRID */}
-        <View style={styles.iconSection}>
-          {[
-            { icon: "🔥", label: "Deals" },
-            { icon: "🏬", label: "DashMart" },
-            { icon: "🍽", label: "Dining Out" },
-            { icon: "🛒", label: "Grocery" },
-            { icon: "🌮", label: "Mexican" },
-            { icon: "🍔", label: "Fast Food" },
-            { icon: "🍕", label: "Pizza" },
-            { icon: "🥣", label: "Soup" },
-          ].map((item, i) => (
-            <TouchableOpacity key={i} style={styles.iconTile}>
-              <View style={styles.iconGlass}>
-                <Text style={styles.iconEmoji}>{item.icon}</Text>
-              </View>
-              <Text style={styles.iconLabel}>{item.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
       </LinearGradient>
 
       <View style={[styles.section, styles.sectionHeader]}>
@@ -277,46 +375,16 @@ export default function HomeScreen() {
           <Text style={styles.seeAllText}>Xem tất cả</Text>
         </TouchableOpacity>
       </View>
-
-      {servicesError && (
-        <Text style={[styles.errorText, { textAlign: "center" }]}>
-          {servicesError}
-        </Text>
-      )}
     </View>
-  );
-
-  if (servicesLoading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <HomeSkeleton />
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <FlatList
-        data={services}
-        renderItem={renderServiceCard}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
-        showsVerticalScrollIndicator={false}
-        columnWrapperStyle={styles.serviceRow}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        ListHeaderComponent={HeaderComponent}
-        ListHeaderComponentStyle={{ marginBottom: 10 }}
-      />
-    </SafeAreaView>
   );
 }
 
-/* ========== STYLES ========== */
+
+/* ============================================================
+   STYLES
+============================================================ */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8F8F8",
-  },
+  container: { flex: 1, backgroundColor: "#F8F8F8" },
 
   header: {
     paddingTop: 50,
@@ -333,11 +401,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  greeting: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginBottom: 4,
-  },
+  greeting: { fontSize: 14, color: "#6B7280", marginBottom: 4 },
 
   userName: {
     fontSize: 26,
@@ -360,11 +424,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
+  avatar: { width: 44, height: 44, borderRadius: 22 },
 
   searchContainer: { marginTop: 4 },
 
@@ -382,58 +442,12 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
 
-  searchInput: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 15,
-    color: "#111827",
-  },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: "#111827" },
 
   filterButton: {
     padding: 8,
     borderRadius: 14,
     backgroundColor: "#FFF4D0",
-  },
-
-  iconSection: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginTop: 22,
-    paddingHorizontal: 10,
-    paddingBottom: 6,
-  },
-
-  iconTile: {
-    width: "23%",
-    alignItems: "center",
-    marginBottom: 22,
-  },
-
-  iconGlass: {
-    width: 64,
-    height: 64,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 5,
-  },
-
-  iconEmoji: {
-    fontSize: 28,
-  },
-
-  iconLabel: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#374151",
-    textAlign: "center",
   },
 
   section: { paddingHorizontal: 20, marginTop: 18 },
@@ -455,10 +469,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-  serviceCardWrapper: {
-    width: "48%",
-    position: "relative",
-  },
+  serviceCardWrapper: { width: "48%", position: "relative" },
 
   serviceCard: {
     backgroundColor: "#ffffff",
@@ -500,18 +511,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
 
-  rating: {
-    fontSize: 11,
-    fontWeight: "600",
-    marginLeft: 3,
-    color: colors.text,
-  },
+  rating: { fontSize: 11, fontWeight: "600", color: colors.text },
 
-  reviewCount: {
-    fontSize: 11,
-    color: "#9CA3AF",
-    marginLeft: 2,
-  },
+  reviewCount: { fontSize: 11, color: "#9CA3AF", marginLeft: 2 },
 
   locationContainer: { flexDirection: "row", alignItems: "center" },
 
@@ -524,11 +526,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
-  price: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#F59E0B",
-  },
+  price: { fontSize: 15, fontWeight: "800", color: "#F59E0B" },
 
   durationContainer: { flexDirection: "row", alignItems: "center" },
 

@@ -6,27 +6,38 @@ import { View, ActivityIndicator } from "react-native";
 
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useFrameworkReady } from "@/hooks/useFrameworkReady";
+import { registerForPushNotifications } from "@/hooks/useNotifications";   // ⭐ Thêm dòng này
+
 
 function RootLayoutNav() {
   const { user, isInitialized } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
-  // ❗ SAFETY: segments[0] luôn tồn tại
   const root = segments?.[0] ?? null;
 
+  /* -------------------------------------------------------
+     ⭐ KHỞI TẠO NOTIFICATION KHI USER ĐÃ LOGIN
+  ------------------------------------------------------- */
+  useEffect(() => {
+    if (isInitialized && user) {
+      registerForPushNotifications(); // tự động xin quyền + gửi token lên backend
+    }
+  }, [isInitialized, user]);
+
+  /* -------------------------------------------------------
+     LOGIC AUTH CŨ CỦA BẠN — GIỮ NGUYÊN
+  ------------------------------------------------------- */
   useEffect(() => {
     if (!isInitialized) return;
 
     const inAuthGroup = root === "(auth)";
 
-    // 1. Chưa đăng nhập → ép login
     if (!user && !inAuthGroup) {
       router.replace("/(auth)/login");
       return;
     }
 
-    // 2. Đã đăng nhập nhưng đang ở (auth) → đẩy theo role
     if (user && inAuthGroup) {
       if (user.roleId === 2) {
         router.replace("/staff");
@@ -36,15 +47,12 @@ function RootLayoutNav() {
       return;
     }
 
-    // 3. Đăng nhập rồi → ép về đúng root nhưng KHÔNG chặn route con
     if (user) {
-      // STAFF (roleId 2)
       if (user.roleId === 2 && root !== "staff") {
         router.replace("/staff");
         return;
       }
 
-      // USER (roleId 3)
       if (user.roleId === 3 && root === "staff") {
         router.replace("/(tabs)");
         return;

@@ -30,33 +30,24 @@ export default function StaffHome() {
 
   const [loading, setLoading] = useState(true);
 
-  // ⭐ BẮT BUỘC: ép avatar re-render khi update
   const [avatarVersion, setAvatarVersion] = useState(0);
 
   useEffect(() => {
     if (user?.avatar) {
-      setAvatarVersion(v => v + 1);
+      setAvatarVersion((v) => v + 1);
     }
   }, [user?.avatar]);
 
-  /* ===============================
-      GET TOKEN
-  =============================== */
   const getToken = async () => {
     const stored = await SecureStore.getItemAsync("my-user-session");
     return JSON.parse(stored || "{}")?.token;
   };
-
-  /* ===============================
-      API GET COUNTS
-  =============================== */
 
   const getTodayCount = async () => {
     const token = await getToken();
     const today = new Date().toISOString().slice(0, 10);
 
     const url = `/booking/get-all?date=${today}&staff_id=${user?.id}`;
-
     const res = await api.get(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -95,6 +86,7 @@ export default function StaffHome() {
     });
 
     const ratings =
+      res.data?.date?.rows ||
       res.data?.ratings ||
       res.data?.rating ||
       res.data?.data ||
@@ -102,13 +94,14 @@ export default function StaffHome() {
 
     if (!Array.isArray(ratings) || ratings.length === 0) return 0;
 
-    const total = ratings.reduce((sum, item) => sum + (item.rating || 0), 0);
+    const total = ratings.reduce(
+      (sum: number, r: any) => sum + (r.rating || r.rate || 0),
+      0
+    );
+
     return Number((total / ratings.length).toFixed(1));
   };
 
-  /* ===============================
-      FETCH ALL STATS
-  =============================== */
   const fetchStats = async () => {
     try {
       setLoading(true);
@@ -132,12 +125,11 @@ export default function StaffHome() {
     fetchStats();
   }, []);
 
-  /* ===============================
-      UI
-  =============================== */
-
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 36 }}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 36 }}
+    >
       <LinearGradient
         colors={["#4F46E5", "#7C3AED"]}
         style={styles.headerGradient}
@@ -150,9 +142,11 @@ export default function StaffHome() {
             </Text>
           </View>
 
-          {/* ⭐ FINAL FIX: avatarVersion → re-render đúng */}
           <Pressable
-            style={({ pressed }) => [styles.avatarWrap, pressed && styles.avatarPressed]}
+            style={({ pressed }) => [
+              styles.avatarWrap,
+              pressed && styles.avatarPressed,
+            ]}
             onPress={() => router.push("/staff/(stafftabs)/profile")}
           >
             <Image
@@ -193,49 +187,99 @@ export default function StaffHome() {
       </LinearGradient>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 30 }} size="large" color="#7C3AED" />
+        <ActivityIndicator
+          style={{ marginTop: 30 }}
+          size="large"
+          color="#7C3AED"
+        />
       ) : (
         <>
-          {/* Row 1 */}
+          {/* ROW 1 */}
           <View style={styles.statsRowLarge}>
-            <LinearGradient
-              colors={["#FFB347", "#FFD27F"]}
-              style={[styles.statCardLarge, styles.cardElev]}
+            {/* Today */}
+            <TouchableOpacity
+              style={{ width: "48%" }}
+              activeOpacity={0.8}
+              onPress={() => router.push("/staff/(stafftabs)/bookings")}
             >
-              <View style={styles.statCardTop}><Calendar color="#1F2937" size={18} /></View>
-              <Text style={styles.statNumberLarge}>{stats.today}</Text>
-              <Text style={styles.statLabelLarge}>Lịch hẹn hôm nay</Text>
-            </LinearGradient>
+              <LinearGradient
+                colors={["#FFB347", "#FFD27F"]}
+                style={[styles.statCardLarge, styles.cardElev]}
+              >
+                <View style={styles.statCardTop}>
+                  <Calendar color="#1F2937" size={18} />
+                </View>
+                <Text style={styles.statNumberLarge}>{stats.today}</Text>
+                <Text style={styles.statLabelLarge}>Lịch hẹn hôm nay</Text>
+              </LinearGradient>
+            </TouchableOpacity>
 
-            <LinearGradient
-              colors={["#FF9A9E", "#FFB48A"]}
-              style={[styles.statCardLarge, styles.cardElev]}
+            {/* Pending */}
+            <TouchableOpacity
+              style={{ width: "48%" }}
+              activeOpacity={0.8}
+              onPress={() =>
+                router.push({
+                  pathname: "/staff/(stafftabs)/bookings",
+                  params: { tab: "pending" },
+                })
+              }
             >
-              <View style={styles.statCardTop}><List color="#1F2937" size={18} /></View>
-              <Text style={styles.statNumberLarge}>{stats.pending}</Text>
-              <Text style={styles.statLabelLarge}>Đang chờ</Text>
-            </LinearGradient>
+              <LinearGradient
+                colors={["#FF9A9E", "#FFB48A"]}
+                style={[styles.statCardLarge, styles.cardElev]}
+              >
+                <View style={styles.statCardTop}>
+                  <List color="#1F2937" size={18} />
+                </View>
+                <Text style={styles.statNumberLarge}>{stats.pending}</Text>
+                <Text style={styles.statLabelLarge}>Đang chờ</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
 
-          {/* Row 2 */}
+          {/* ROW 2 */}
           <View style={styles.statsRowLarge}>
-            <LinearGradient
-              colors={["#86E3CE", "#A0E7E5"]}
-              style={[styles.statCardLarge, styles.cardElev]}
+            {/* Completed */}
+            <TouchableOpacity
+              style={{ width: "48%" }}
+              activeOpacity={0.8}
+              onPress={() =>
+                router.push({
+                  pathname: "/staff/(stafftabs)/bookings",
+                  params: { tab: "completed" },
+                })
+              }
             >
-              <View style={styles.statCardTop}><ChevronRight color="#1F2937" size={18} /></View>
-              <Text style={styles.statNumberLarge}>{stats.completed}</Text>
-              <Text style={styles.statLabelLarge}>Hoàn thành</Text>
-            </LinearGradient>
+              <LinearGradient
+                colors={["#86E3CE", "#A0E7E5"]}
+                style={[styles.statCardLarge, styles.cardElev]}
+              >
+                <View style={styles.statCardTop}>
+                  <ChevronRight color="#1F2937" size={18} />
+                </View>
+                <Text style={styles.statNumberLarge}>{stats.completed}</Text>
+                <Text style={styles.statLabelLarge}>Hoàn thành</Text>
+              </LinearGradient>
+            </TouchableOpacity>
 
-            <LinearGradient
-              colors={["#C4B5FD", "#A78BFA"]}
-              style={[styles.statCardLarge, styles.cardElev]}
+            {/* Rating */}
+            <TouchableOpacity
+              style={{ width: "48%" }}
+              activeOpacity={0.8}
+              onPress={() => router.push("/staff/(stafftabs)/rating")}
             >
-              <View style={styles.statCardTop}><Star color="#1F2937" size={18} /></View>
-              <Text style={styles.statNumberLarge}>{stats.rating} ★</Text>
-              <Text style={styles.statLabelLarge}>Đánh giá</Text>
-            </LinearGradient>
+              <LinearGradient
+                colors={["#C4B5FD", "#A78BFA"]}
+                style={[styles.statCardLarge, styles.cardElev]}
+              >
+                <View style={styles.statCardTop}>
+                  <Star color="#1F2937" size={18} />
+                </View>
+                <Text style={styles.statNumberLarge}>{stats.rating} ★</Text>
+                <Text style={styles.statLabelLarge}>Đánh giá</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </>
       )}
@@ -243,9 +287,9 @@ export default function StaffHome() {
   );
 }
 
-/* ===============================
-      CSS
-=============================== */
+/* ============================
+        STYLES
+============================ */
 const styles = StyleSheet.create({
   container: { backgroundColor: "#F7F7F7", flex: 1 },
   headerGradient: {
@@ -255,10 +299,13 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
   },
-  headerInner: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  headerInner: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   headerTitleWhite: { fontSize: 22, fontWeight: "800", color: "#FFF" },
   headerSubWhite: { marginTop: 6, color: "rgba(255,255,255,0.9)" },
-
   avatarWrap: {
     borderRadius: 28,
     overflow: "hidden",
@@ -267,8 +314,11 @@ const styles = StyleSheet.create({
   },
   avatarPressed: { opacity: 0.8 },
   avatar: { width: 56, height: 56, borderRadius: 28 },
-
-  headerActions: { flexDirection: "row", justifyContent: "space-between", marginTop: 16 },
+  headerActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+  },
   quickBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -279,7 +329,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   quickBtnText: { color: "#FFF", marginLeft: 6, fontWeight: "600", fontSize: 13 },
-
   statsRowLarge: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -287,15 +336,19 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   statCardLarge: {
-    width: "48%",
+    width: "100%",
     padding: 18,
     borderRadius: 14,
     minHeight: 110,
   },
-  statCardTop: { position: "absolute", top: 12, right: 12, opacity: 0.9 },
+  statCardTop: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    opacity: 0.9,
+  },
   statNumberLarge: { fontSize: 28, fontWeight: "900", color: "#1F2937" },
   statLabelLarge: { marginTop: 8, fontSize: 13, color: "#334155" },
-
   cardElev: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },

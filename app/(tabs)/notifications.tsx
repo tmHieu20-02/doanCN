@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,12 +15,29 @@ import {
   Settings,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as SecureStore from "expo-secure-store";
+import { router } from "expo-router";
 
 import { colors, radius, shadow, spacing } from "@/ui/theme";
 
-// ==============================
-// 1️⃣ Empty State
-// ==============================
+/* ==============================
+   1️⃣ Types
+================================ */
+type NotificationItem = {
+  id: number;
+  type?: string;
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+  icon: "calendar" | "check" | "bell";
+  color: string;
+  bookingId?: string;
+};
+
+/* ==============================
+   2️⃣ Empty State
+================================ */
 const EmptyState = ({
   icon,
   title,
@@ -37,48 +54,144 @@ const EmptyState = ({
   </View>
 );
 
-// ==============================
-// 2️⃣ Dummy Data
-// ==============================
-const notifications = [
-  {
-    id: 1,
-    type: "booking_reminder",
-    title: "Nhắc nhở lịch hẹn",
-    message: "Bạn có lịch hẹn cắt tóc vào 14:30 ngày mai",
-    time: "5 phút trước",
-    read: false,
-    icon: "calendar",
-    color: colors.primaryDark,
-  },
-  {
-    id: 2,
-    type: "booking_confirmed",
-    title: "Lịch hẹn đã được xác nhận",
-    message: "Spa Premium đã xác nhận lịch hẹn massage",
-    time: "2 giờ trước",
-    read: false,
-    icon: "check",
-    color: colors.success,
-  },
-  {
-    id: 3,
-    type: "promotion",
-    title: "Ưu đãi đặc biệt",
-    message: "Giảm 20% cho dịch vụ cuối tuần",
-    time: "1 ngày trước",
-    read: true,
-    icon: "bell",
-    color: colors.warning,
-  },
-];
+/* ==============================
+   3️⃣ API helpers
+================================ */
+const getToken = async () => {
+  const session = await SecureStore.getItemAsync("my-user-session");
+  const token = session ? JSON.parse(session).token : null;
+  return token;
+};
 
-// ==============================
-// 3️⃣ Main Component
-// ==============================
+// Fetch all notifications
+const fetchNotifications = async (): Promise<any[]> => {
+  const token = await getToken();
+  const res = await fetch("https://phatdat.store/api/v1/notification/get-all", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  return json.data || [];
+};
+
+// Mark one read
+const apiMarkRead = async (id: number) => {
+  const token = await getToken();
+  await fetch(`https://phatdat.store/api/v1/notification/read/${id}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+};
+
+// Mark all read
+const apiMarkAll = async () => {
+  const token = await getToken();
+  await fetch("https://phatdat.store/api/v1/notification/read-all", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+};
+
+// Delete notification
+const apiDelete = async (id: number) => {
+  const token = await getToken();
+  await fetch(`https://phatdat.store/api/v1/notification/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+};
+
+/* ==============================
+   4️⃣ Helper Mapping
+================================ */
+const formatTime = (createdAt?: string) => {
+  if (!createdAt) return "";
+  try {
+    return new Date(createdAt).toLocaleString("vi-VN");
+  } catch {
+    return "";
+  }
+};
+
+const getIconName = (type?: string): NotificationItem["icon"] => {
+  switch (type) {
+    case "booking_created":
+    case "booking_reminder":
+      return "calendar";
+    case "booking_confirmed":
+    case "booking_incoming":
+    case "booking_completed":
+      return "check";
+    default:
+      return "bell";
+  }
+};
+
+const getColorByType = (type?: string): string => {
+  switch (type) {
+    case "booking_created":
+    case "booking_reminder":
+      return colors.primaryDark;
+    case "booking_confirmed":
+    case "booking_incoming":
+    case "booking_completed":
+      return colors.success;
+    case "booking_canceled":
+      return colors.warning;
+    default:
+      return colors.primary;
+  }
+};
+
+/* FINAL FIX — mapping bookingId from both BE formats */
+const mapNotificationFromApi = (n: any): NotificationItem => {
+  let bookingId = n.bookingId;
+
+  // Case BE stores data as object: { bookingId: 12 }
+  if (!bookingId && typeof n.data === "object") {
+    bookingId = n.data?.bookingId;
+  }
+
+  // Case BE stores JSON string: '{"bookingId":12}'
+  if (!bookingId && typeof n.data === "string") {
+    try {
+      const parsed = JSON.parse(n.data);
+      bookingId = parsed.bookingId;
+    } catch {}
+  }
+
+  return {
+    id: n.id,
+    type: n.type,
+    title: n.title,
+    message: n.message,
+    time: formatTime(n.createdAt),
+    read: !!n.isRead,
+    icon: getIconName(n.type),
+    color: getColorByType(n.type),
+    bookingId: bookingId ? String(bookingId) : undefined,
+  };
+};
+
+/* ==============================
+   5️⃣ Main Component
+================================ */
 export default function NotificationsScreen() {
-  const [list, setList] = useState(notifications);
-  const [filter, setFilter] = useState("all");
+  const [list, setList] = useState<NotificationItem[]>([]);
+  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const raw = await fetchNotifications();
+      const mapped = raw.map(mapNotificationFromApi);
+      setList(mapped);
+    } catch (error) {
+      console.log("LOAD NOTIFICATIONS ERROR:", error);
+    }
+  };
 
   const unreadCount = list.filter((n) => !n.read).length;
 
@@ -89,16 +202,45 @@ export default function NotificationsScreen() {
       ? list.filter((n) => !n.read)
       : list.filter((n) => n.read);
 
-  const markAsRead = (id: number) =>
-    setList((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+  const markAsRead = async (id: number) => {
+    try {
+      await apiMarkRead(id);
+      setList((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+    } catch (error) {
+      console.log("MARK READ ERROR:", error);
+    }
+  };
 
-  const markAllAsRead = () =>
-    setList((prev) => prev.map((n) => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    try {
+      await apiMarkAll();
+      setList((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch (error) {
+      console.log("MARK ALL READ ERROR:", error);
+    }
+  };
 
-  const deleteItem = (id: number) =>
-    setList((prev) => prev.filter((n) => n.id !== id));
+  const deleteItem = async (id: number) => {
+    try {
+      await apiDelete(id);
+      setList((prev) => prev.filter((n) => n.id !== id));
+    } catch (error) {
+      console.log("DELETE NOTIFICATION ERROR:", error);
+    }
+  };
+
+  /* FIX — Điều hướng đúng screen booking/[id].tsx */
+  const openDetail = (item: NotificationItem) => {
+  if (!item.bookingId) return;
+
+  router.push({
+    pathname: "../booking/[id]",   // FIXED ✔
+    params: { id: String(item.bookingId) },
+  });
+};
+
 
   const getIcon = (icon: string, color: string) => {
     switch (icon) {
@@ -111,10 +253,13 @@ export default function NotificationsScreen() {
     }
   };
 
-  const renderItem = ({ item }: any) => (
+  const renderItem = ({ item }: { item: NotificationItem }) => (
     <TouchableOpacity
       style={[styles.card, !item.read && styles.cardUnread]}
-      onPress={() => !item.read && markAsRead(item.id)}
+      onPress={async () => {
+        if (!item.read) await markAsRead(item.id);
+        openDetail(item);
+      }}
     >
       <View style={styles.row}>
         <View
@@ -135,8 +280,10 @@ export default function NotificationsScreen() {
           >
             {item.title}
           </Text>
+
           <Text style={styles.cardMessage}>{item.message}</Text>
-          <Text style={styles.cardTime}>{item.time}</Text>
+
+          {item.time && <Text style={styles.cardTime}>{item.time}</Text>}
         </View>
 
         <TouchableOpacity
@@ -152,50 +299,44 @@ export default function NotificationsScreen() {
   );
 
   const FILTERS = [
-    { id: "all", label: "Tất cả" },
-    { id: "unread", label: "Chưa đọc" },
-    { id: "read", label: "Đã đọc" },
+    { id: "all" as const, label: "Tất cả" },
+    { id: "unread" as const, label: "Chưa đọc" },
+    { id: "read" as const, label: "Đã đọc" },
   ];
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <LinearGradient
+        colors={[colors.primary, colors.primaryAlt]}
+        style={styles.header}
+      >
+        <View style={styles.headerTopRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Thông báo</Text>
+            <Text style={styles.headerSubtitle}>
+              {unreadCount > 0
+                ? `${unreadCount} thông báo mới`
+                : "Bạn đã xem hết nội dung"}
+            </Text>
+          </View>
 
-      {/* ======================= HEADER (đẹp – canh phải) ======================= */}
-    {/* ===== HEADER ===== */}
-<LinearGradient
-  colors={[colors.primary, colors.primaryAlt]}
-  style={styles.header}
->
-  {/* --- TOP ROW: TITLE + SETTINGS --- */}
-  <View style={styles.headerTopRow}>
-    <View style={{ flex: 1 }}>
-      <Text style={styles.headerTitle}>Thông báo</Text>
-      <Text style={styles.headerSubtitle}>
-        {unreadCount > 0
-          ? `${unreadCount} thông báo mới`
-          : "Bạn đã xem hết nội dung"}
-      </Text>
-    </View>
+          <TouchableOpacity style={styles.headerIcon}>
+            <Settings size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
 
-    {/* Bánh răng bên phải */}
-    <TouchableOpacity style={styles.headerIcon}>
-      <Settings size={20} color={colors.text} />
-    </TouchableOpacity>
-  </View>
+        {unreadCount > 0 && (
+          <TouchableOpacity
+            style={styles.markAllWrapper}
+            onPress={markAllAsRead}
+          >
+            <Text style={styles.markAllText}>Đánh dấu tất cả</Text>
+          </TouchableOpacity>
+        )}
+      </LinearGradient>
 
-  {/* --- BOTTOM RIGHT: MARK ALL AS READ --- */}
-  {unreadCount > 0 && (
-    <TouchableOpacity
-      style={styles.markAllWrapper}
-      onPress={markAllAsRead}
-    >
-      <Text style={styles.markAllText}>Đánh dấu tất cả</Text>
-    </TouchableOpacity>
-  )}
-</LinearGradient>
-
-
-      {/* ======================= FILTER ======================= */}
+      {/* Filter */}
       <View style={styles.filterRow}>
         {FILTERS.map((f) => (
           <TouchableOpacity
@@ -218,7 +359,7 @@ export default function NotificationsScreen() {
         ))}
       </View>
 
-      {/* ======================= LIST ======================= */}
+      {/* List */}
       {filteredList.length ? (
         <FlatList
           data={filteredList}
@@ -237,60 +378,58 @@ export default function NotificationsScreen() {
   );
 }
 
-// ==============================
-// 4️⃣ Styles
-// ==============================
+/* ==============================
+   Styles
+================================ */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
   header: {
-  padding: spacing(6),
-  paddingBottom: spacing(10),
-  borderBottomLeftRadius: radius.xl,
-  borderBottomRightRadius: radius.xl,
-  ...shadow.card,
-},
+    padding: spacing(6),
+    paddingBottom: spacing(10),
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+    ...shadow.card,
+  },
 
-headerTopRow: {
-  flexDirection: "row",
-  alignItems: "center",
-},
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
 
-headerTitle: {
-  fontSize: 28,
-  fontWeight: "800",
-  color: colors.text,
-},
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: colors.text,
+  },
 
-headerSubtitle: {
-  fontSize: 14,
-  marginTop: 4,
-  color: colors.textMuted,
-},
+  headerSubtitle: {
+    fontSize: 14,
+    marginTop: 4,
+    color: colors.textMuted,
+  },
 
-headerIcon: {
-  padding: spacing(3),
-  borderRadius: radius.lg,
-  backgroundColor: colors.primaryLight,
-},
+  headerIcon: {
+    padding: spacing(3),
+    borderRadius: radius.lg,
+    backgroundColor: colors.primaryLight,
+  },
 
-/* Button “Đánh dấu tất cả” nằm dưới - bên phải */
-markAllWrapper: {
-  marginTop: spacing(4),
-  alignSelf: "flex-end",
-  backgroundColor: colors.primaryDark,
-  paddingHorizontal: spacing(4),
-  paddingVertical: spacing(2),
-  borderRadius: radius.lg,
-},
+  markAllWrapper: {
+    marginTop: spacing(4),
+    alignSelf: "flex-end",
+    backgroundColor: colors.primaryDark,
+    paddingHorizontal: spacing(4),
+    paddingVertical: spacing(2),
+    borderRadius: radius.lg,
+  },
 
-markAllText: {
-  color: colors.card,
-  fontSize: 12,
-  fontWeight: "700",
-},
+  markAllText: {
+    color: colors.card,
+    fontSize: 12,
+    fontWeight: "700",
+  },
 
-  /* --- Filters --- */
   filterRow: {
     flexDirection: "row",
     padding: spacing(4),
@@ -320,7 +459,6 @@ markAllText: {
     color: colors.card,
   },
 
-  /* --- Notification Card --- */
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
@@ -381,7 +519,6 @@ markAllText: {
     right: spacing(3),
   },
 
-  /* --- Empty State --- */
   emptyWrapper: {
     paddingVertical: spacing(20),
     alignItems: "center",
@@ -402,5 +539,4 @@ markAllText: {
     textAlign: "center",
     width: "70%",
   },
-  
 });
