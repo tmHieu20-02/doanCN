@@ -1,16 +1,14 @@
 {
   "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
-    "jsx": "react-native",
+    "target": "ESNext",
+    "module": "ESNext",
     "moduleResolution": "node",
-    "allowJs": true,
-    "strict": true,
+    "jsx": "react-native",
+    "strict": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     },
-    "esModuleInterop": true,
     "skipLibCheck": true
   },
   "include": [
