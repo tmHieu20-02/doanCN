@@ -6,8 +6,7 @@ import { View, ActivityIndicator } from "react-native";
 
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useFrameworkReady } from "@/hooks/useFrameworkReady";
-import { registerForPushNotifications } from "@/hooks/useNotifications";   // ⭐ Thêm dòng này
-
+// import { registerForPushNotifications } from "@/hooks/useNotifications"; // ❌ XÓA
 
 function RootLayoutNav() {
   const { user, isInitialized } = useAuth();
@@ -16,18 +15,13 @@ function RootLayoutNav() {
 
   const root = segments?.[0] ?? null;
 
-  /* -------------------------------------------------------
-     ⭐ KHỞI TẠO NOTIFICATION KHI USER ĐÃ LOGIN
-  ------------------------------------------------------- */
-  useEffect(() => {
-    if (isInitialized && user) {
-      registerForPushNotifications(); // tự động xin quyền + gửi token lên backend
-    }
-  }, [isInitialized, user]);
+  // ❌ COMMENT toàn bộ notification logic
+  // useEffect(() => {
+  //   if (isInitialized && user) {
+  //     registerForPushNotifications();
+  //   }
+  // }, [isInitialized, user]);
 
-  /* -------------------------------------------------------
-     LOGIC AUTH CŨ CỦA BẠN — GIỮ NGUYÊN
-  ------------------------------------------------------- */
   useEffect(() => {
     if (!isInitialized) return;
 

@@ -1,0 +1,11 @@
+{
+  "java.configuration.excludeFolders": [
+    "node_modules",
+    ".expo"
+  ],
+  "java.project.explorer.showNonJavaProjects": false,
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.expo/**": true
+  }
+}
