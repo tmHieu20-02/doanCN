@@ -23,6 +23,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { MotiView, AnimatePresence } from "moti";
 import { Animated } from 'react-native';
 import { AxiosError } from "axios";
+import { getExpoPushToken } from "@/utils/pushToken";
+import { registerDeviceToken } from "@/utils/registerDeviceToken";
+
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -80,41 +83,75 @@ export default function LoginScreen() {
   const [canResendReset, setCanResendReset] = useState(false);
   const [resendLoadingReset, setResendLoadingReset] = useState(false);
   const resetShakeAnim = useRef(new Animated.Value(0)).current;
+/* ============================= LOGIN ============================= */
+const handleSignIn = async () => {
+  if (!numberPhone || !password) {
+    Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin.");
+    return;
+  }
 
-  /* ============================= LOGIN ============================= */
-  const handleSignIn = async () => {
-    if (!numberPhone || !password) {
-      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin.");
+  if (!/^[0-9]{10}$/.test(numberPhone)) {
+    Alert.alert("Lỗi", "Số điện thoại phải gồm đúng 10 số.");
+    return;
+  }
+
+  if (password.length < 6) {
+    Alert.alert("Lỗi", "Mật khẩu quá ngắn.");
+    return;
+  }
+
+  setLoginLoading(true);
+
+  try {
+    console.log("🟡 BẮT ĐẦU LOGIN");
+
+    const result = await signIn({
+      numberPhone: numberPhone.trim(),
+      password: password.trim(),
+    });
+
+    console.log("🟢 LOGIN RESULT:", result);
+
+    if (!result.success) {
+      Alert.alert(
+        "Đăng nhập thất bại",
+        result.message || "Kiểm tra lại thông tin."
+      );
       return;
     }
 
-    if (!/^[0-9]{10}$/.test(numberPhone)) {
-      Alert.alert("Lỗi", "Số điện thoại phải gồm đúng 10 số.");
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert("Lỗi", "Mật khẩu quá ngắn.");
-      return;
-    }
-
-    setLoginLoading(true);
-
+    /* =====================================================
+       PUSH NOTIFICATION – ĐÚNG & ĐỦ
+    ===================================================== */
     try {
-      const result = await signIn({
-        numberPhone: numberPhone.trim(),
-        password: password.trim(),
-      });
+      console.log("🟡 BẮT ĐẦU LẤY EXPO PUSH TOKEN");
 
-      if (!result.success) {
-        Alert.alert("Đăng nhập thất bại", result.message || "Kiểm tra lại thông tin.");
+      const expoToken = await getExpoPushToken();
+      console.log("🔥 EXPO PUSH TOKEN:", expoToken);
+
+      if (!expoToken) {
+        console.log("❌ KHÔNG LẤY ĐƯỢC TOKEN (permission / device?)");
+        return;
       }
-    } catch {
-      Alert.alert("Lỗi", "Có lỗi hệ thống xảy ra.");
-    } finally {
-      setLoginLoading(false);
+
+      console.log("🟡 GỬI TOKEN VỀ BACKEND...");
+      const res = await registerDeviceToken(expoToken);
+
+      console.log("✅ REGISTER DEVICE TOKEN RESPONSE:", res);
+    } catch (e) {
+      console.log("❌ REGISTER DEVICE TOKEN ERROR:", e);
     }
-  };
+    /* ===================================================== */
+
+  } catch (err) {
+    console.log("❌ LOGIN SYSTEM ERROR:", err);
+    Alert.alert("Lỗi", "Có lỗi hệ thống xảy ra.");
+  } finally {
+    setLoginLoading(false);
+    console.log("🟣 KẾT THÚC LOGIN FLOW");
+  }
+};
+
 
   /* ============================= FORGOT PASSWORD ============================= */
   const handleSendOtp = async () => {

@@ -7,9 +7,13 @@ import {
   TouchableOpacity,
   Image,
   Switch,
-  SafeAreaView,
+  // LOẠI BỎ SafeAreaView cũ
+  // SafeAreaView,
   Animated,
 } from "react-native";
+
+// IMPORT SafeAreaView TỪ CONTEXT
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "../../hooks/useAuth";
 import { useRouter } from "expo-router";
@@ -158,7 +162,8 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    // FIX: Dùng SafeAreaView từ Context
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
 
         {/* HEADER */}
@@ -207,17 +212,15 @@ export default function ProfileScreen() {
                 {section.items.map((item, index) => (
                   <TouchableOpacity
                     key={item.id}
-                   onPress={() => {
-  if (item.id === "edit-profile") {
-    router.push("/profile/edit");
-  }
+                    onPress={() => {
+                      if (item.id === "edit-profile") {
+                        router.push("/profile/edit");
+                      }
 
-  if (item.id === "favorites") {
-    router.push("../favorite");
-
-
-  }
-}}
+                      if (item.id === "favorites") {
+                        router.push("../favorite");
+                      }
+                    }}
 
                     style={[
                       styles.menuItem,

@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/hooks/useAuth";
-import { LogOut } from "lucide-react-native";
+import { LogOut, Pencil } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import api from "@/utils/api";
 import * as SecureStore from "expo-secure-store";
@@ -22,9 +22,9 @@ export default function StaffProfile() {
     user?.avatar || "https://phatdat.store/default-avatar.png"
   );
 
-  /* ================================
-        SYNC SESSION KHI MỞ MÀN
-  ================================= */
+  /* --------------------------------------------
+        SYNC AVATAR KHI MỞ MÀN
+  -------------------------------------------- */
   useEffect(() => {
     const syncSession = async () => {
       const stored = await SecureStore.getItemAsync("my-user-session");
@@ -36,14 +36,9 @@ export default function StaffProfile() {
     syncSession();
   }, []);
 
-  const handleLogout = async () => {
-    await signOut();
-    router.replace("/login");
-  };
-
-  /* ================================
-        PICK + UPDATE UI NGAY
-  ================================= */
+  /* --------------------------------------------
+        PICK AVATAR
+  -------------------------------------------- */
   const handlePickAvatar = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
@@ -57,39 +52,34 @@ export default function StaffProfile() {
 
     if (result.canceled) return;
 
-    const imageUri = result.assets[0].uri;
+    const uri = result.assets[0].uri;
 
-    // ⚡ 1. Update UI ngay lập tức
-    setAvatarUrl(imageUri);
+    // Update UI trước
+    setAvatarUrl(uri);
 
-    // ⚡ 2. Update session local
+    // Update local session
     const stored = await SecureStore.getItemAsync("my-user-session");
     if (stored) {
       const session = JSON.parse(stored);
-      session.avatar = imageUri;
+      session.avatar = uri;
       await SecureStore.setItemAsync("my-user-session", JSON.stringify(session));
     }
 
-    // ⭐ 3. Update AuthContext → STAFF HOME cập nhật ngay lập tức
-    await updateUser({ avatar: imageUri });
+    // Update context
+    await updateUser({ avatar: uri });
 
-    Alert.alert("Thành công", "Cập nhật ảnh đại diện thành công!");
-
-    // ⚙ 4. Upload background
-    uploadAvatar(imageUri).catch(() => {});
+    // Upload BE ngầm
+    uploadAvatar(uri).catch(() => {});
   };
 
-  /* ================================
-        UPLOAD BACKEND (ASYNC)
-  ================================= */
-  const uploadAvatar = async (imageUri: string) => {
+  const uploadAvatar = async (uri: string) => {
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const token = JSON.parse(stored || "{}")?.token;
 
-      let form = new FormData();
+      const form = new FormData();
       form.append("avatar", {
-        uri: imageUri,
+        uri,
         name: "avatar.jpg",
         type: "image/jpeg",
       } as any);
@@ -101,65 +91,65 @@ export default function StaffProfile() {
         },
       });
 
-      console.log("UPLOAD RES:", res.data);
-
-      // Backend trả URL thật
       if (res.data?.data?.avatar) {
-        const realUrl = res.data.data.avatar;
-
-        setAvatarUrl(realUrl);
-        await updateUser({ avatar: realUrl });
-
-        const updated = JSON.stringify({
-          ...JSON.parse(stored || "{}"),
-          avatar: realUrl,
-        });
-
-        await SecureStore.setItemAsync("my-user-session", updated);
+        setAvatarUrl(res.data.data.avatar);
+        updateUser({ avatar: res.data.data.avatar });
       }
-    } catch (err) {
-      console.log("Upload error:", err);
+    } catch (e) {
+      console.log("Upload avatar error:", e);
     }
+  };
+
+  /* --------------------------------------------
+          LOGOUT
+  -------------------------------------------- */
+  const handleLogout = async () => {
+    await signOut();
+    router.replace("/login");
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Hồ sơ nhân viên</Text>
 
-      {/* AVATAR + INFO */}
-      <View style={styles.profileBox}>
-        <TouchableOpacity onPress={handlePickAvatar}>
-          <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
-        </TouchableOpacity>
+      {/* AVATAR */}
+      <View style={styles.avatarWrapper}>
+        <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
 
-        <Text style={styles.name}>{user?.full_name || `Nhân viên #${user?.id}`}</Text>
-        <Text style={styles.phone}>{user?.numberPhone}</Text>
-
-        <View style={styles.roleTag}>
-          <Text style={styles.roleText}>Staff</Text>
-        </View>
-
-        <TouchableOpacity style={styles.uploadBtn} onPress={handlePickAvatar}>
-          <Text style={styles.uploadText}>Đổi ảnh đại diện</Text>
+        {/* ICON CÂY BÚT */}
+        <TouchableOpacity style={styles.editAvatarBtn} onPress={handlePickAvatar}>
+          <Pencil size={18} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* INFO */}
+      <Text style={styles.name}>{user?.full_name}</Text>
+      <Text style={styles.phone}>{user?.numberPhone}</Text>
+
+      <View style={styles.roleTag}>
+        <Text style={styles.roleText}>Staff</Text>
+      </View>
+
+      {/* INFO BOX */}
       <View style={styles.infoBox}>
         <Text style={styles.infoItem}>
-          <Text style={styles.label}>ID: </Text>
-          {user?.id}
+          <Text style={styles.label}>ID:</Text> {user?.id}
         </Text>
 
         <Text style={styles.infoItem}>
-          <Text style={styles.label}>Số điện thoại: </Text>
-          {user?.numberPhone}
+          <Text style={styles.label}>Số điện thoại:</Text> {user?.numberPhone}
         </Text>
 
         <Text style={styles.infoItem}>
-          <Text style={styles.label}>Vai trò: </Text>
-          Nhân viên (Staff)
+          <Text style={styles.label}>Vai trò:</Text> Nhân viên (Staff)
         </Text>
+
+        {/* BUTTON EDIT PROFILE */}
+        <TouchableOpacity
+          style={styles.editProfileBtn}
+          onPress={() => router.push("/staff/profile/edit")} // FIX ROUTER 100%
+        >
+          <Text style={styles.editProfileText}>Chỉnh sửa thông tin salon</Text>
+        </TouchableOpacity>
       </View>
 
       {/* LOGOUT */}
@@ -171,9 +161,9 @@ export default function StaffProfile() {
   );
 }
 
-/* ================================
-      CSS
-================================ */
+/* =============================================
+      STYLE FINAL – GỌN – ĐẸP – TINH TẾ
+============================================= */
 const styles = StyleSheet.create({
   container: {
     padding: 20,
@@ -187,89 +177,98 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  profileBox: {
-    alignItems: "center",
-    marginBottom: 30,
+  avatarWrapper: {
+    width: 130,
+    height: 130,
+    alignSelf: "center",
+    marginTop: 10,
   },
 
   avatarImg: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
     backgroundColor: "#ddd",
+  },
+
+  editAvatarBtn: {
+    position: "absolute",
+    bottom: 6,
+    right: 6,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#2563EB",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   name: {
     fontSize: 20,
     fontWeight: "700",
+    textAlign: "center",
     marginTop: 12,
   },
 
   phone: {
+    textAlign: "center",
     color: "#666",
-    fontSize: 15,
     marginTop: 4,
   },
 
   roleTag: {
+    alignSelf: "center",
     backgroundColor: "#EFEFEF",
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 8,
     marginTop: 8,
   },
 
-  roleText: {
-    color: "#444",
-    fontWeight: "600",
-  },
-
-  uploadBtn: {
-    marginTop: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    backgroundColor: "#7C3AED",
-    borderRadius: 8,
-  },
-
-  uploadText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 13,
-  },
+  roleText: { color: "#444", fontWeight: "600" },
 
   infoBox: {
     backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-    elevation: 2,
+    padding: 18,
+    borderRadius: 14,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
 
-  infoItem: {
-    fontSize: 15,
-    marginBottom: 10,
+  infoItem: { fontSize: 15, marginBottom: 10 },
+
+  label: { fontWeight: "700", color: "#333" },
+
+  editProfileBtn: {
+    backgroundColor: "#E6EEFF",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+    marginTop: 10,
   },
 
-  label: {
-    fontWeight: "700",
-    color: "#333",
+  editProfileText: {
+    color: "#2563EB",
+    fontWeight: "600",
+    fontSize: 14,
   },
 
   logoutBtn: {
-    marginTop: 10,
+    marginTop: 25,
     paddingVertical: 14,
     backgroundColor: "#E53935",
     borderRadius: 10,
-    alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
+    alignItems: "center",
   },
 
   logoutText: {
     color: "#fff",
     fontSize: 16,
-    marginLeft: 8,
+    marginLeft: 6,
     fontWeight: "600",
   },
 });

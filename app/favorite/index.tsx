@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,10 @@ import {
   Image,
   SafeAreaView,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { Star, Heart } from "lucide-react-native";
 
@@ -18,32 +19,52 @@ export default function FavoriteScreen() {
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadFavorites();
-  }, []);
-
+  /* ======================================
+     LOAD FAVORITES
+  ====================================== */
   const loadFavorites = async () => {
     try {
+      setLoading(true);
+
       const session = await SecureStore.getItemAsync("my-user-session");
       const token = session ? JSON.parse(session).token : null;
 
-      const res = await fetch("https://phatdat.store/api/v1/favorite/get-all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        "https://phatdat.store/api/v1/favorite/get-all",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       const json = await res.json();
 
       if (json.err === 0) {
-        setFavorites(json.data);
+        setFavorites(json.data || []);
+      } else {
+        setFavorites([]);
       }
     } catch (error) {
       console.log("LOAD FAVORITE ERROR:", error);
+      setFavorites([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // DELETE FAVORITE 
+  useEffect(() => {
+    loadFavorites();
+  }, []);
+
+  // reload khi quay lại màn
+  useFocusEffect(
+    useCallback(() => {
+      loadFavorites();
+    }, [])
+  );
+
+  /* ======================================
+     REMOVE FAVORITE (FE GỬI service_id)
+  ====================================== */
   const removeFavorite = async (service_id: number) => {
     const session = await SecureStore.getItemAsync("my-user-session");
     const token = session ? JSON.parse(session).token : null;
@@ -62,22 +83,28 @@ export default function FavoriteScreen() {
   };
 
   /* ======================================
-       CARD
+     CARD
   ====================================== */
   const renderItem = ({ item }: any) => {
-    const s = item.service;
-    if (!s) return null;
+    const service = item.service;
+    if (!service) return null;
 
     return (
       <View style={styles.card}>
-        
-        {/* HEART BUTTON – xoá yêu thích */}
+        {/* ❤️ HEART – REMOVE FAVORITE */}
         <TouchableOpacity
           style={styles.heart}
           onPress={async () => {
-            const res = await removeFavorite(s.id);
-            if (res.err === 0) {
-              setFavorites((prev) => prev.filter((f) => f.service_id !== s.id));
+            // Optimistic UI
+            setFavorites((prev) =>
+              prev.filter((f) => f.service_id !== item.service_id)
+            );
+
+            const res = await removeFavorite(item.service_id);
+
+            if (res.err !== 0) {
+              Alert.alert("Lỗi", "Không thể xoá yêu thích");
+              loadFavorites(); // rollback nếu BE fail
             }
           }}
         >
@@ -88,18 +115,22 @@ export default function FavoriteScreen() {
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() =>
-            router.push({ pathname: "/service/[id]", params: { id: s.id } })
+            router.push({
+              pathname: "/service/[id]",
+              params: { id: service.id },
+            })
           }
         >
           <View style={styles.imageWrapper}>
             <Image
               source={{
-                uri: s.image || "https://via.placeholder.com/300?text=No+Image",
+                uri:
+                  service.image ||
+                  "https://via.placeholder.com/300?text=No+Image",
               }}
               style={styles.image}
             />
 
-            {/* TAG */}
             <View style={styles.tag}>
               <Text style={styles.tagText}>Yêu thích</Text>
             </View>
@@ -107,7 +138,7 @@ export default function FavoriteScreen() {
 
           <View style={styles.info}>
             <Text style={styles.name} numberOfLines={2}>
-              {s.name}
+              {service.name}
             </Text>
 
             <View style={styles.ratingRow}>
@@ -118,7 +149,7 @@ export default function FavoriteScreen() {
             </View>
 
             <Text style={styles.price}>
-              {Number(s.price).toLocaleString("vi-VN")} đ
+              {Number(service.price).toLocaleString("vi-VN")} đ
             </Text>
           </View>
         </TouchableOpacity>
@@ -145,12 +176,11 @@ export default function FavoriteScreen() {
       <FlatList
         data={favorites}
         renderItem={renderItem}
-        keyExtractor={(item) =>
-          (item.service_id || item.id || Math.random()).toString()
-        }
+        keyExtractor={(item) => item.service_id.toString()}
         numColumns={2}
         columnWrapperStyle={{ justifyContent: "space-between" }}
         contentContainerStyle={{ paddingTop: 10, paddingBottom: 60 }}
+        showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
   );

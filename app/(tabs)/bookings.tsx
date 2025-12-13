@@ -1,7 +1,4 @@
-// ===========================================================
-// BOOKING SCREEN FINAL WITH RE-BOOK BUTTON
-// ===========================================================
-
+// BookingsScreen.tsx
 import React, { useState, useCallback } from 'react';
 import {
   View,
@@ -9,12 +6,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
   RefreshControl,
-  StatusBar,
+  // Đã bỏ import StatusBar của react-native vì dùng của expo-status-bar
 } from 'react-native';
+// THAY ĐỔI QUAN TRỌNG: Import SafeAreaView từ thư viện context
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from "expo-status-bar"; // Import StatusBar của Expo
+
+// ... các imports và types khác giữ nguyên logic (như code bạn gửi)
 import {
   Calendar,
   Clock,
@@ -29,9 +30,62 @@ import * as SecureStore from 'expo-secure-store';
 import api from '../../utils/api';
 import { colors, radius, shadow } from '@/ui/theme';
 
-/* ------------------------------------ */
-/* Empty State */
-/* ------------------------------------ */
+export type BookingItem = {
+  id: number;
+  service_id: number;
+  user_id: number;
+
+  number_phone: string;
+  booking_date: string;
+  start_time: string;
+  end_time: string;
+
+  status: string;
+  note?: string;
+
+  total_price: number;
+  booking_type: "at_store" | "at_home";
+  address_text?: string;
+
+  service?: {
+    id: number;
+    name: string;
+    price?: number;
+    duration_minutes?: number;
+    category_name?: string;
+  };
+
+  customer?: {
+    id: number;
+    full_name: string;
+    email?: string;
+    phone_number?: string;
+  };
+
+  has_review?: boolean;
+};
+
+export type Booking = {
+  id: number;
+  serviceId: number;
+  serviceName: string;
+  serviceType: string;
+
+  date: string;
+  time: string;
+  duration: string;
+  price: number | string;
+
+  status: string;
+  address: string;
+  bookingType?: string;
+
+  canCancel?: boolean;
+  hasReview?: boolean;
+};
+
+// ... component EmptyState giữ nguyên logic
+
 const EmptyState = ({
   icon,
   title,
@@ -57,36 +111,16 @@ const EmptyState = ({
   </View>
 );
 
-/* ------------------------------------ */
-/* Types */
-/* ------------------------------------ */
-type BookingTab = {
-  id: 'upcoming' | 'completed' | 'cancelled';
-  name: string;
-  count: number;
-};
-
-type Booking = {
-  id: number;
-  serviceId: number;
-  serviceName: string;
-  serviceType: string;
-  date: string;
-  time: string;
-  duration: string;
-  price: string | number;
-  status: string;
-  address: string;
-  canCancel?: boolean;
-};
-
-/* ------------------------------------ */
+/* ------------------------------------------------------------ */
 /* MAIN COMPONENT */
-/* ------------------------------------ */
+/* ------------------------------------------------------------ */
+
 export default function BookingsScreen() {
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
+  const [activeTab, setActiveTab] =
+    useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -94,9 +128,7 @@ export default function BookingsScreen() {
   const [completed, setCompleted] = useState<Booking[]>([]);
   const [cancelled, setCancelled] = useState<Booking[]>([]);
 
-  /* ------------------------------------ */
-  /* Fetch bookings */
-  /* ------------------------------------ */
+  // ... logic fetchBookings, useFocusEffect, onRefresh, handleBookNow giữ nguyên
   const fetchBookings = async () => {
     try {
       setLoading(true);
@@ -115,13 +147,13 @@ export default function BookingsScreen() {
       const res = await api.get('/booking/get-all');
       const list = res.data.bookings || [];
 
-      const userBookings = list.filter((b: any) => b.user_id === userId);
+      const userBookings = list.filter((b: BookingItem) => b.user_id === userId);
 
       const up: Booking[] = [];
       const com: Booking[] = [];
       const can: Booking[] = [];
 
-      userBookings.forEach((item: any) => {
+      userBookings.forEach((item) => {
         const rawStatus = (item.status || '').toLowerCase();
 
         const booking: Booking = {
@@ -129,18 +161,27 @@ export default function BookingsScreen() {
           serviceId: item.service?.id,
           serviceName: item.service?.name || 'Dịch vụ',
           serviceType: item.service?.category_name || 'Không có danh mục',
+
           date: item.booking_date ? String(item.booking_date).slice(0, 10) : '',
           time: item.start_time ? String(item.start_time).slice(0, 5) : '',
           duration: `${item.service?.duration_minutes || 60} phút`,
           price: item.total_price || item.service?.price || 0,
+
           status: rawStatus,
-          address: 'Tại cửa hàng',
+          hasReview: item.has_review || false,
+
+          address:
+            item.booking_type === "at_home"
+              ? item.address_text || "Tại nhà"
+              : "Tại cửa hàng",
+
+          bookingType: item.booking_type,
           canCancel: true,
         };
 
-        if (['canceled', 'cancelled', 'rejected', 'bom'].includes(booking.status)) {
+        if (['canceled', 'cancelled', 'rejected', 'bom'].includes(rawStatus)) {
           can.push(booking);
-        } else if (['completed', 'done'].includes(booking.status)) {
+        } else if (['completed', 'done'].includes(rawStatus)) {
           com.push(booking);
         } else {
           up.push(booking);
@@ -170,10 +211,7 @@ export default function BookingsScreen() {
   };
 
   const handleBookNow = () => router.push('/');
-
-  /* ------------------------------------ */
-  /* Cancel booking API */
-  /* ------------------------------------ */
+  // ... logic handleCancelBooking giữ nguyên
   const handleCancelBooking = (bookingId: number) => {
     Alert.alert(
       "Xác nhận hủy lịch",
@@ -208,24 +246,29 @@ export default function BookingsScreen() {
       ]
     );
   };
-
-  /* ------------------------------------ */
-  /* Helpers */
-  /* ------------------------------------ */
+  // ... logic getStatusStyle, formatPrice, bookingTabs, getCurrentBookings giữ nguyên
   const getStatusStyle = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'confirmed':
         return { bg: '#DCFCE7', text: colors.success, label: 'Đã xác nhận' };
+
       case 'pending':
         return { bg: '#FEF3C7', text: colors.warning, label: 'Chờ xác nhận' };
+
       case 'canceled':
       case 'cancelled':
       case 'rejected':
       case 'bom':
         return { bg: '#FEE2E2', text: colors.danger, label: 'Đã hủy' };
+
       case 'completed':
       case 'done':
-        return { bg: '#E0E7FF', text: colors.primary, label: 'Hoàn thành' };
+        return {
+          bg: '#D1FAE5',
+          text: '#059669',
+          label: 'Hoàn thành'
+        };
+
       default:
         return { bg: '#F3F4F6', text: colors.textMuted, label: status };
     }
@@ -236,7 +279,7 @@ export default function BookingsScreen() {
       Number(price)
     );
 
-  const bookingTabs: BookingTab[] = [
+  const bookingTabs = [
     { id: 'upcoming', name: 'Sắp tới', count: upcoming.length },
     { id: 'completed', name: 'Hoàn thành', count: completed.length },
     { id: 'cancelled', name: 'Đã hủy', count: cancelled.length },
@@ -248,10 +291,9 @@ export default function BookingsScreen() {
     return cancelled;
   };
 
-  /* ------------------------------------ */
-  /* Render Tab Button */
-  /* ------------------------------------ */
-  const renderTabButton = ({ item }: { item: BookingTab }) => {
+  // ... logic renderTabButton, renderBookingItem giữ nguyên
+
+  const renderTabButton = ({ item }: any) => {
     const isActive = activeTab === item.id;
 
     return (
@@ -274,20 +316,19 @@ export default function BookingsScreen() {
     );
   };
 
-  /* ------------------------------------ */
-  /* Render Booking Item */
-  /* ------------------------------------ */
   const renderBookingItem = ({ item }: { item: Booking }) => {
     const statusStyle = getStatusStyle(item.status);
 
     return (
       <View style={styles.bookingCard}>
-        {/* Header */}
+
+        {/* HEADER */}
         <View style={styles.bookingHeader}>
           <View style={styles.bookingInfo}>
             <Text style={styles.serviceName}>{item.serviceName}</Text>
             <Text style={styles.serviceType}>{item.serviceType}</Text>
           </View>
+
           <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
             <Text style={[styles.statusText, { color: statusStyle.text }]}>
               {statusStyle.label}
@@ -295,25 +336,27 @@ export default function BookingsScreen() {
           </View>
         </View>
 
-        {/* Details */}
+        {/* DETAILS */}
         <View style={styles.bookingDetails}>
           <View style={styles.detailRow}>
             <Calendar size={16} color={colors.textMuted} />
             <Text style={styles.detailText}>{item.date}</Text>
           </View>
+
           <View style={styles.detailRow}>
             <Clock size={16} color={colors.textMuted} />
             <Text style={styles.detailText}>
               {item.time} • {item.duration}
             </Text>
           </View>
+
           <View style={styles.detailRow}>
             <MapPin size={16} color={colors.textMuted} />
             <Text style={styles.detailText}>{item.address}</Text>
           </View>
         </View>
 
-        {/* Footer */}
+        {/* FOOTER */}
         <View style={styles.bookingFooter}>
           <Text style={styles.price}>{formatPrice(item.price)}</Text>
 
@@ -326,7 +369,7 @@ export default function BookingsScreen() {
               <MessageCircle size={18} color={colors.primaryDark} />
             </TouchableOpacity>
 
-            {/* Cancel Button */}
+            {/* UPCOMING = CANCEL */}
             {activeTab === 'upcoming' && item.canCancel && (
               <TouchableOpacity
                 style={styles.cancelButton}
@@ -336,22 +379,38 @@ export default function BookingsScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Rating Button */}
+            {/* COMPLETED = REVIEW + REBOOK */}
             {activeTab === 'completed' && (
-              <TouchableOpacity
-                style={styles.ratingButton}
-                onPress={() =>
-                  router.push({
-                    pathname: '/rating/create',
-                    params: { serviceId: item.serviceId, bookingId: item.id },
-                  })
-                }
-              >
-                <Text style={styles.ratingButtonText}>Đánh giá</Text>
-              </TouchableOpacity>
+              <>
+                {!item.hasReview && (
+                  <TouchableOpacity
+                    style={styles.reviewButton}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/rating/create",
+                        params: {
+                          serviceId: item.serviceId,
+                          bookingId: item.id
+                        }
+                      })
+                    }
+                  >
+                    <Text style={styles.reviewButtonText}>Đánh giá</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={styles.rebookButton}
+                  onPress={() =>
+                    router.push(`/service/${item.serviceId}?rebook=1`)
+                  }
+                >
+                  <Text style={styles.rebookButtonText}>Đặt lại</Text>
+                </TouchableOpacity>
+              </>
             )}
 
-            {/* ⭐ RE-BOOK BUTTON ADDED HERE ⭐ */}
+            {/* CANCELLED = ONLY REBOOK */}
             {activeTab === 'cancelled' && (
               <TouchableOpacity
                 style={styles.rebookButton}
@@ -371,12 +430,16 @@ export default function BookingsScreen() {
 
   const currentBookings = getCurrentBookings();
 
-  /* ------------------------------------ */
+  /* ------------------------------------------------------------ */
   /* UI */
-  /* ------------------------------------ */
+  /* ------------------------------------------------------------ */
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+    // FIX: Bọc ngoài cùng bằng SafeAreaView từ react-native-safe-area-context
+    // edges={['top']} đảm bảo chỉ thêm padding ở trên
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      {/* StatusBar để quản lý màu nền Status Bar (đã đổi sang dark-content) */}
+      <StatusBar style="light" backgroundColor={colors.primary} />
 
       <LinearGradient
         colors={[colors.primary, colors.primaryAlt]}
@@ -397,7 +460,11 @@ export default function BookingsScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
+        <ActivityIndicator
+          size="large"
+          color={colors.primary}
+          style={{ marginTop: 50 }}
+        />
       ) : currentBookings.length > 0 ? (
         <FlatList
           data={currentBookings}
@@ -420,15 +487,15 @@ export default function BookingsScreen() {
             activeTab === 'upcoming'
               ? 'Không có lịch hẹn sắp tới'
               : activeTab === 'completed'
-                ? 'Chưa có lịch hẹn hoàn thành'
-                : 'Không có lịch hẹn bị hủy'
+              ? 'Chưa có lịch hẹn hoàn thành'
+              : 'Không có lịch hẹn bị hủy'
           }
           subtitle={
             activeTab === 'upcoming'
               ? 'Đặt lịch hẹn đầu tiên của bạn ngay thôi!'
               : activeTab === 'completed'
-                ? 'Hoàn thành một dịch vụ để xem lịch sử'
-                : 'Tuyệt vời! Bạn chưa hủy lịch hẹn nào'
+              ? 'Hoàn thành một dịch vụ để xem lịch sử'
+              : 'Tuyệt vời! Bạn chưa hủy lịch hẹn nào'
           }
           buttonText={activeTab === 'upcoming' ? 'Đặt lịch ngay' : undefined}
           onPress={activeTab === 'upcoming' ? handleBookNow : undefined}
@@ -438,19 +505,21 @@ export default function BookingsScreen() {
   );
 }
 
-/* ------------------------------------ */
+/* ------------------------------------------------------------ */
 /* STYLES */
-/* ------------------------------------ */
+/* ------------------------------------------------------------ */
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
   header: {
-    paddingTop: 20,
+    paddingTop: 20, // Giữ nguyên padding top cho Header vì SafeAreaView đã lo phần trên.
     paddingBottom: 35,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
+  // ... các styles còn lại giữ nguyên
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
@@ -546,13 +615,16 @@ const styles = StyleSheet.create({
   },
 
   statusBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 50,
+    alignSelf: 'flex-start',
   },
+
   statusText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
+    opacity: 0.95,
   },
 
   bookingDetails: {
@@ -578,6 +650,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#F3F4F6',
     paddingTop: 14,
   },
+
   price: {
     fontSize: 17,
     fontWeight: '800',
@@ -611,20 +684,6 @@ const styles = StyleSheet.create({
     color: colors.danger,
   },
 
-  ratingButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    backgroundColor: '#FEE2B3',
-    borderRadius: 10,
-    marginLeft: 8,
-  },
-  ratingButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#B45309',
-  },
-
-  /* ⭐ BUTTON ĐẶT LẠI ⭐ */
   rebookButton: {
     paddingHorizontal: 14,
     paddingVertical: 9,
@@ -636,6 +695,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#0369A1',
+  },
+
+  reviewButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    backgroundColor: '#DCFCE7',
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  reviewButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#059669',
   },
 
   emptyWrapper: {
@@ -657,6 +729,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
+
   emptyButton: {
     backgroundColor: colors.primary,
     paddingHorizontal: 24,
@@ -671,4 +744,3 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
 });
-

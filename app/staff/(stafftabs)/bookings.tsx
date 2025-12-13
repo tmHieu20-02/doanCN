@@ -13,8 +13,13 @@ import axios from "axios";
 import { cancelAllBookings as cancelAllService } from "../serviceId/bookingService";
 import * as SecureStore from "expo-secure-store";
 
-// ✅ Thêm "completed" vào union
-type BookingStatus = "" | "pending" | "confirmed" | "completed" | "done" | "cancelled";
+type BookingStatus =
+  | ""
+  | "pending"
+  | "confirmed"
+  | "completed"
+  | "done"
+  | "cancelled";
 
 export default function StaffBooking() {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -22,9 +27,9 @@ export default function StaffBooking() {
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<BookingStatus>("");
 
-  // ==========================
-  // 🔵 GET ALL BOOKINGS
-  // ==========================
+  // ========================================================
+  // LOAD BOOKINGS
+  // ========================================================
   const fetchBookings = async (opts?: { silent?: boolean }) => {
     try {
       if (!opts?.silent) setLoading(true);
@@ -43,9 +48,7 @@ export default function StaffBooking() {
         }
       );
 
-      const list =
-        res.data?.bookings || res.data?.data || res.data?.items || [];
-
+      const list = res.data?.bookings || res.data?.data || [];
       setBookings(list);
     } catch (err: any) {
       console.log("❌ Lỗi lấy booking:", err?.response?.data || err);
@@ -64,10 +67,13 @@ export default function StaffBooking() {
     fetchBookings({ silent: true });
   };
 
-  // ==========================
-  // 🔵 CONFIRM 1 BOOKING
-  // ==========================
-  const confirmBooking = async (booking: any, nextStatus: "confirmed" | "completed") => {
+  // ========================================================
+  // UPDATE STATUS (CONFIRM / COMPLETE)
+  // ========================================================
+  const confirmBooking = async (
+    booking: any,
+    nextStatus: "confirmed" | "completed"
+  ) => {
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const token = JSON.parse(stored!).token;
@@ -78,7 +84,7 @@ export default function StaffBooking() {
         start_time: booking.start_time?.slice(0, 5),
         end_time: booking.end_time?.slice(0, 5),
         note: booking.note || "",
-        status: nextStatus, // "confirmed" hoặc "completed"
+        status: nextStatus,
       };
 
       await axios.put(
@@ -88,17 +94,17 @@ export default function StaffBooking() {
       );
 
       fetchBookings({ silent: true });
-    } catch (error: any) {
-      console.log("❌ Lỗi cập nhật:", error?.response?.data || error);
+    } catch (err) {
+      console.log("❌ Lỗi cập nhật:", err);
     }
   };
 
-  // ==========================
-  // 🔵 HỦY TẤT CẢ LỊCH HẸN (FINAL)
-  // ==========================
+  // ========================================================
+  // CANCEL ALL BOOKINGS
+  // ========================================================
   const handleCancelAllBookings = () => {
     Alert.alert(
-      "Hủy toàn bộ lịch hẹn hôm nay",
+      "Hủy lịch hẹn hôm nay",
       "Bạn có chắc muốn hủy TẤT CẢ lịch hẹn hôm nay không?",
       [
         { text: "Không" },
@@ -107,16 +113,14 @@ export default function StaffBooking() {
           style: "destructive",
           onPress: async () => {
             try {
-              const body = {
+              const res = await cancelAllService({
                 cancel_note: "Shop nghỉ đột xuất",
-              };
+              });
 
-              const res = await cancelAllService(body);
-              console.log("🔥 HỦY TOÀN BỘ THÀNH CÔNG:", res.data);
-
+              console.log("🔥 Hủy toàn bộ:", res.data);
               fetchBookings({ silent: true });
-            } catch (error: any) {
-              console.log("❌ Lỗi hủy all:", error?.response?.data || error);
+            } catch (error) {
+              console.log("❌ Lỗi hủy hết:", error);
             }
           },
         },
@@ -124,84 +128,96 @@ export default function StaffBooking() {
     );
   };
 
-  // ==========================
-  // 🔵 UI
-  // ==========================
-  const renderStatusBadge = (statusRaw: string) => {
-    const status = (statusRaw || "").toLowerCase();
+  // ========================================================
+  // STATUS BADGE
+  // ========================================================
+  const getStatusBadge = (raw: string) => {
+    const s = (raw || "").toLowerCase();
 
-    let bg = "#6B7280";
-    let label = statusRaw;
+    const map: any = {
+      pending: { text: "Chờ xác nhận", bg: "#F59E0B" },
+      confirmed: { text: "Đã xác nhận", bg: "#3B82F6" },
+      completed: { text: "Hoàn tất", bg: "#10B981" },
+      done: { text: "Hoàn tất", bg: "#10B981" },
+      cancelled: { text: "Đã hủy", bg: "#EF4444" },
+      canceled: { text: "Đã hủy", bg: "#EF4444" },
+    };
 
-    switch (status) {
-      case "pending":
-        bg = "#F59E0B";
-        label = "Chờ xác nhận";
-        break;
-      case "confirmed":
-        bg = "#3B82F6";
-        label = "Đã xác nhận";
-        break;
-      case "completed":
-      case "done":
-        bg = "#10B981";
-        label = "Hoàn tất";
-        break;
-      case "cancelled":
-      case "canceled":
-        bg = "#EF4444";
-        label = "Đã hủy";
-        break;
-    }
-
-    return (
-      <View style={[styles.badge, { backgroundColor: bg }]}>
-        <Text style={styles.badgeText}>{label}</Text>
-      </View>
-    );
+    return map[s] || { text: "Không rõ", bg: "#6B7280" };
   };
 
+  // ========================================================
+  // RENDER ONE BOOKING CARD (ĐÃ FIX)
+  // ========================================================
   const renderItem = ({ item }: any) => {
-    const serviceName =
-      item.service?.name || item.service_name || "Dịch vụ";
+    const service = item.service || {};
+    const serviceName = service.name || "Dịch vụ";
 
-    const customerName =
-      item.customer?.full_name || item.user_name || "Ẩn danh";
+    // ✔ FIX: LẤY booking_type → KHÔNG DÙNG service.service_type
+    let serviceType = "Tại salon";
+    if (item.booking_type === "at_home") serviceType = "Tại nhà";
 
-    const price =
-      item.service?.price || item.total_price || 0;
+    const customerName = item.customer?.full_name || "Ẩn danh";
 
-    const status: string = item.status || "pending";
+    // Giá
+    const rawPrice =
+      item.total_price ??
+      item.totalPrice ??
+      service.price ??
+      service.cost ??
+      0;
+
+    const price = Number(rawPrice).toLocaleString("vi-VN") + " đ";
+
+    const badge = getStatusBadge(item.status);
 
     return (
       <View style={styles.card}>
-        <View style={{ position: "absolute", top: 10, right: 10 }}>
-          {renderStatusBadge(status)}
+        {/* STATUS BADGE */}
+        <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+          <Text style={styles.badgeText}>{badge.text}</Text>
         </View>
 
-        <Text style={styles.service}>{serviceName}</Text>
-        <Text style={styles.customer}>Khách: {customerName}</Text>
-        <Text style={styles.customer}>Giá: {price.toLocaleString()}đ</Text>
+        {/* SERVICE INFO */}
+        <Text style={styles.serviceName}>{serviceName}</Text>
+        <Text style={styles.serviceType}>Loại dịch vụ: {serviceType}</Text>
 
+        {/* ✔ HIỂN THỊ ĐỊA CHỈ NẾU TẠI NHÀ */}
+        {item.booking_type === "at_home" && item.address_text ? (
+          <Text style={styles.customer}>Địa chỉ: {item.address_text}</Text>
+        ) : null}
+
+        {/* CUSTOMER */}
+        <Text style={styles.customer}>Khách: {customerName}</Text>
+
+        {/* PRICE */}
+        <Text style={styles.price}>Giá: {price}</Text>
+
+        {/* TIME */}
         <Text style={styles.time}>
-          {item.start_time?.slice(0, 5)} - {item.end_time?.slice(0, 5)} •{" "}
+          {item.start_time?.slice(0, 5)} – {item.end_time?.slice(0, 5)} •{" "}
           {item.booking_date?.slice(0, 10)}
         </Text>
 
-        {/* Hành động theo trạng thái */}
+        {/* NOTE */}
+        <Text style={styles.note}>
+          Ghi chú: {item.note?.trim() || "Không có"}
+        </Text>
+
+        {/* ACTION BUTTONS */}
         <View style={styles.actionRow}>
-          {status === "pending" && (
+          {item.status === "pending" && (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: "#2563EB" }]}
+              style={[styles.actionBtn, styles.confirmBtn]}
               onPress={() => confirmBooking(item, "confirmed")}
             >
               <Text style={styles.actionText}>Xác nhận</Text>
             </TouchableOpacity>
           )}
 
-          {status === "confirmed" && (
+          {item.status === "confirmed" && (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: "#10B981" }]}
+              style={[styles.actionBtn, styles.doneBtn]}
               onPress={() => confirmBooking(item, "completed")}
             >
               <Text style={styles.actionText}>Hoàn tất</Text>
@@ -212,6 +228,9 @@ export default function StaffBooking() {
     );
   };
 
+  // ========================================================
+  // FILTER BUTTON
+  // ========================================================
   const renderFilterButton = (label: string, value: BookingStatus) => {
     const active = statusFilter === value;
 
@@ -227,22 +246,28 @@ export default function StaffBooking() {
     );
   };
 
+  // ========================================================
+  // LOADING SCREEN
+  // ========================================================
   if (loading && !refreshing) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#2563EB" />
-        <Text style={{ marginTop: 10, color: "#4B5563" }}>
+        <Text style={{ marginTop: 10, color: "#6B7280" }}>
           Đang tải lịch hẹn...
         </Text>
       </View>
     );
   }
 
+  // ========================================================
+  // MAIN SCREEN
+  // ========================================================
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Lịch hẹn của bạn</Text>
 
-      {/* 🔥 NÚT HỦY TẤT CẢ LỊCH HẸN */}
+      {/* CANCEL ALL */}
       <TouchableOpacity
         style={styles.cancelAllBtn}
         onPress={handleCancelAllBookings}
@@ -250,10 +275,9 @@ export default function StaffBooking() {
         <Text style={styles.cancelAllText}>Hủy lịch hôm nay</Text>
       </TouchableOpacity>
 
-      <Text style={styles.sub}>
-        Xem và quản lý các lịch hẹn được giao cho bạn
-      </Text>
+      <Text style={styles.sub}>Xem và quản lý lịch hẹn được giao cho bạn</Text>
 
+      {/* FILTER ROW */}
       <View style={styles.filterRow}>
         {renderFilterButton("Tất cả", "")}
         {renderFilterButton("Chờ", "pending")}
@@ -262,6 +286,7 @@ export default function StaffBooking() {
         {renderFilterButton("Đã hủy", "cancelled")}
       </View>
 
+      {/* LIST */}
       <FlatList
         data={bookings}
         keyExtractor={(item) => String(item.id)}
@@ -269,7 +294,7 @@ export default function StaffBooking() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        contentContainerStyle={{ paddingBottom: 24, paddingTop: 10 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Text style={styles.emptyText}>Hiện chưa có lịch hẹn nào</Text>
@@ -280,93 +305,95 @@ export default function StaffBooking() {
   );
 }
 
+// ========================================================
+// STYLES – PREMIUM UI
+// ========================================================
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F7F7F7", padding: 16 },
+  container: { flex: 1, backgroundColor: "#F8FAFC", padding: 16 },
 
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  title: { fontSize: 22, fontWeight: "700", color: "#111827" },
+  title: { fontSize: 22, fontWeight: "800", color: "#111827" },
 
-  sub: { fontSize: 13, color: "#6B7280", marginTop: 4, marginBottom: 14 },
+  sub: { fontSize: 14, color: "#6B7280", marginBottom: 12 },
 
   cancelAllBtn: {
     alignSelf: "flex-start",
     backgroundColor: "#EF4444",
     paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 18,
     borderRadius: 8,
-    marginTop: 6,
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  cancelAllText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 13,
-  },
+  cancelAllText: { color: "#fff", fontWeight: "700", fontSize: 13 },
 
   filterRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    marginBottom: 6,
+    justifyContent: "space-between",
+    marginBottom: 12,
   },
+
   filterBtn: {
-    paddingHorizontal: 10,
     paddingVertical: 6,
+    paddingHorizontal: 14,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "#D1D5DB",
-    marginRight: 6,
-    marginBottom: 6,
-    backgroundColor: "#FFF",
+    backgroundColor: "#fff",
   },
   filterBtnActive: {
     backgroundColor: "#2563EB",
     borderColor: "#2563EB",
   },
-  filterText: { fontSize: 12, color: "#4B5563", fontWeight: "500" },
-  filterTextActive: { color: "#FFF" },
+  filterText: { fontSize: 12, color: "#374151", fontWeight: "600" },
+  filterTextActive: { color: "#fff" },
 
   card: {
-    backgroundColor: "#FFFFFF",
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 12,
+    backgroundColor: "#FFF",
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 16,
     shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
 
-  service: { fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 2 },
-  customer: { fontSize: 13, color: "#374151", marginTop: 2 },
-
-  time: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 8,
-  },
-
   badge: {
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 6,
+    position: "absolute",
+    top: 12,
+    right: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
-  badgeText: { color: "#FFF", fontSize: 10, fontWeight: "600" },
+  badgeText: { color: "#FFF", fontWeight: "700", fontSize: 10 },
 
-  actionRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 12,
-    gap: 8,
-  },
-  actionBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-  },
-  actionText: { color: "#FFF", fontSize: 12, fontWeight: "600" },
+  serviceName: { fontSize: 17, fontWeight: "800", color: "#111827" },
+  serviceType: { fontSize: 13, color: "#6B7280", marginTop: 4 },
 
-  emptyBox: { alignItems: "center", marginTop: 60 },
+  customer: { fontSize: 14, color: "#374151", marginTop: 6 },
+
+  price: { fontSize: 14, color: "#1F2937", fontWeight: "700", marginTop: 4 },
+
+  time: { fontSize: 12, color: "#6B7280", marginTop: 8 },
+
+  note: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    marginTop: 6,
+    fontStyle: "italic",
+  },
+
+  actionRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 14, gap: 10 },
+
+  actionBtn: { paddingVertical: 8, paddingHorizontal: 18, borderRadius: 8 },
+  confirmBtn: { backgroundColor: "#2563EB" },
+  doneBtn: { backgroundColor: "#10B981" },
+
+  actionText: { color: "#FFF", fontSize: 12, fontWeight: "700" },
+
+  emptyBox: { marginTop: 40, alignItems: "center" },
   emptyText: { color: "#6B7280", fontSize: 14 },
 });

@@ -5,8 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  SafeAreaView,
+  // LOẠI BỎ SafeAreaView từ react-native
+  // SafeAreaView, 
 } from "react-native";
+// IMPORT SafeAreaView TỪ CONTEXT
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Bell,
   Calendar,
@@ -21,7 +24,7 @@ import { router } from "expo-router";
 import { colors, radius, shadow, spacing } from "@/ui/theme";
 
 /* ==============================
-   1️⃣ Types
+   TYPES
 ================================ */
 type NotificationItem = {
   id: number;
@@ -36,7 +39,7 @@ type NotificationItem = {
 };
 
 /* ==============================
-   2️⃣ Empty State
+   EMPTY STATE
 ================================ */
 const EmptyState = ({
   icon,
@@ -55,61 +58,53 @@ const EmptyState = ({
 );
 
 /* ==============================
-   3️⃣ API helpers
+   API HELPERS
 ================================ */
 const getToken = async () => {
   const session = await SecureStore.getItemAsync("my-user-session");
-  const token = session ? JSON.parse(session).token : null;
-  return token;
+  return session ? JSON.parse(session).token : null;
 };
 
-// Fetch all notifications
 const fetchNotifications = async (): Promise<any[]> => {
   const token = await getToken();
-  const res = await fetch("https://phatdat.store/api/v1/notification/get-all", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await fetch(
+    "https://phatdat.store/api/v1/notification/get-all",
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
   const json = await res.json();
   return json.data || [];
 };
 
-// Mark one read
 const apiMarkRead = async (id: number) => {
   const token = await getToken();
-  await fetch(`https://phatdat.store/api/v1/notification/read/${id}`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  await fetch(
+    `https://phatdat.store/api/v1/notification/read/${id}`,
+    { method: "PUT", headers: { Authorization: `Bearer ${token}` } }
+  );
 };
 
-// Mark all read
 const apiMarkAll = async () => {
   const token = await getToken();
-  await fetch("https://phatdat.store/api/v1/notification/read-all", {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  await fetch(
+    "https://phatdat.store/api/v1/notification/read-all",
+    { method: "PUT", headers: { Authorization: `Bearer ${token}` } }
+  );
 };
 
-// Delete notification
 const apiDelete = async (id: number) => {
   const token = await getToken();
-  await fetch(`https://phatdat.store/api/v1/notification/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  await fetch(
+    `https://phatdat.store/api/v1/notification/${id}`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
+  );
 };
 
 /* ==============================
-   4️⃣ Helper Mapping
+   HELPERS
 ================================ */
 const formatTime = (createdAt?: string) => {
   if (!createdAt) return "";
-  try {
-    return new Date(createdAt).toLocaleString("vi-VN");
-  } catch {
-    return "";
-  }
+  return new Date(createdAt).toLocaleString("vi-VN");
 };
 
 const getIconName = (type?: string): NotificationItem["icon"] => {
@@ -142,20 +137,19 @@ const getColorByType = (type?: string): string => {
   }
 };
 
-/* FINAL FIX — mapping bookingId from both BE formats */
+/* ==============================
+   MAP API → UI
+================================ */
 const mapNotificationFromApi = (n: any): NotificationItem => {
   let bookingId = n.bookingId;
 
-  // Case BE stores data as object: { bookingId: 12 }
   if (!bookingId && typeof n.data === "object") {
     bookingId = n.data?.bookingId;
   }
 
-  // Case BE stores JSON string: '{"bookingId":12}'
   if (!bookingId && typeof n.data === "string") {
     try {
-      const parsed = JSON.parse(n.data);
-      bookingId = parsed.bookingId;
+      bookingId = JSON.parse(n.data)?.bookingId;
     } catch {}
   }
 
@@ -173,7 +167,7 @@ const mapNotificationFromApi = (n: any): NotificationItem => {
 };
 
 /* ==============================
-   5️⃣ Main Component
+   MAIN SCREEN
 ================================ */
 export default function NotificationsScreen() {
   const [list, setList] = useState<NotificationItem[]>([]);
@@ -184,13 +178,8 @@ export default function NotificationsScreen() {
   }, []);
 
   const loadData = async () => {
-    try {
-      const raw = await fetchNotifications();
-      const mapped = raw.map(mapNotificationFromApi);
-      setList(mapped);
-    } catch (error) {
-      console.log("LOAD NOTIFICATIONS ERROR:", error);
-    }
+    const raw = await fetchNotifications();
+    setList(raw.map(mapNotificationFromApi));
   };
 
   const unreadCount = list.filter((n) => !n.read).length;
@@ -202,64 +191,20 @@ export default function NotificationsScreen() {
       ? list.filter((n) => !n.read)
       : list.filter((n) => n.read);
 
-  const markAsRead = async (id: number) => {
-    try {
-      await apiMarkRead(id);
-      setList((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-      );
-    } catch (error) {
-      console.log("MARK READ ERROR:", error);
-    }
-  };
+  const openDetail = async (item: NotificationItem) => {
+    if (!item.read) await apiMarkRead(item.id);
+    if (!item.bookingId) return;
 
-  const markAllAsRead = async () => {
-    try {
-      await apiMarkAll();
-      setList((prev) => prev.map((n) => ({ ...n, read: true })));
-    } catch (error) {
-      console.log("MARK ALL READ ERROR:", error);
-    }
-  };
-
-  const deleteItem = async (id: number) => {
-    try {
-      await apiDelete(id);
-      setList((prev) => prev.filter((n) => n.id !== id));
-    } catch (error) {
-      console.log("DELETE NOTIFICATION ERROR:", error);
-    }
-  };
-
-  /* FIX — Điều hướng đúng screen booking/[id].tsx */
-  const openDetail = (item: NotificationItem) => {
-  if (!item.bookingId) return;
-
-  router.push({
-    pathname: "../booking/[id]",   // FIXED ✔
-    params: { id: String(item.bookingId) },
-  });
-};
-
-
-  const getIcon = (icon: string, color: string) => {
-    switch (icon) {
-      case "calendar":
-        return <Calendar size={20} color={color} />;
-      case "check":
-        return <CheckCircle size={20} color={color} />;
-      default:
-        return <Bell size={20} color={color} />;
-    }
+    router.push({
+      pathname: "../booking/[id]",
+      params: { id: item.bookingId },
+    });
   };
 
   const renderItem = ({ item }: { item: NotificationItem }) => (
     <TouchableOpacity
       style={[styles.card, !item.read && styles.cardUnread]}
-      onPress={async () => {
-        if (!item.read) await markAsRead(item.id);
-        openDetail(item);
-      }}
+      onPress={() => openDetail(item)}
     >
       <View style={styles.row}>
         <View
@@ -268,28 +213,24 @@ export default function NotificationsScreen() {
             { backgroundColor: item.color + "22" },
           ]}
         >
-          {getIcon(item.icon, item.color)}
+          {item.icon === "calendar" ? (
+            <Calendar size={20} color={item.color} />
+          ) : item.icon === "check" ? (
+            <CheckCircle size={20} color={item.color} />
+          ) : (
+            <Bell size={20} color={item.color} />
+          )}
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text
-            style={[
-              styles.cardTitle,
-              !item.read && styles.cardTitleUnread,
-            ]}
-          >
+          <Text style={[styles.cardTitle, !item.read && styles.bold]}>
             {item.title}
           </Text>
-
           <Text style={styles.cardMessage}>{item.message}</Text>
-
-          {item.time && <Text style={styles.cardTime}>{item.time}</Text>}
+          <Text style={styles.cardTime}>{item.time}</Text>
         </View>
 
-        <TouchableOpacity
-          onPress={() => deleteItem(item.id)}
-          style={styles.deleteBtn}
-        >
+        <TouchableOpacity onPress={() => apiDelete(item.id)}>
           <X size={16} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
@@ -298,73 +239,26 @@ export default function NotificationsScreen() {
     </TouchableOpacity>
   );
 
-  const FILTERS = [
-    { id: "all" as const, label: "Tất cả" },
-    { id: "unread" as const, label: "Chưa đọc" },
-    { id: "read" as const, label: "Đã đọc" },
-  ];
-
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    // FIX: Dùng SafeAreaView từ Context để bảo vệ tai thỏ
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <LinearGradient
         colors={[colors.primary, colors.primaryAlt]}
         style={styles.header}
       >
-        <View style={styles.headerTopRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Thông báo</Text>
-            <Text style={styles.headerSubtitle}>
-              {unreadCount > 0
-                ? `${unreadCount} thông báo mới`
-                : "Bạn đã xem hết nội dung"}
-            </Text>
-          </View>
-
-          <TouchableOpacity style={styles.headerIcon}>
-            <Settings size={20} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-
-        {unreadCount > 0 && (
-          <TouchableOpacity
-            style={styles.markAllWrapper}
-            onPress={markAllAsRead}
-          >
-            <Text style={styles.markAllText}>Đánh dấu tất cả</Text>
-          </TouchableOpacity>
-        )}
+        <Text style={styles.headerTitle}>Thông báo</Text>
+        <Text style={styles.headerSubtitle}>
+          {unreadCount
+            ? `${unreadCount} thông báo mới`
+            : "Bạn đã xem hết"}
+        </Text>
       </LinearGradient>
 
-      {/* Filter */}
-      <View style={styles.filterRow}>
-        {FILTERS.map((f) => (
-          <TouchableOpacity
-            key={f.id}
-            onPress={() => setFilter(f.id)}
-            style={[
-              styles.filterBtn,
-              filter === f.id && styles.filterBtnActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                filter === f.id && styles.filterTextActive,
-              ]}
-            >
-              {f.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* List */}
       {filteredList.length ? (
         <FlatList
           data={filteredList}
           renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(i) => i.id.toString()}
           contentContainerStyle={{ padding: 20 }}
         />
       ) : (
@@ -379,164 +273,48 @@ export default function NotificationsScreen() {
 }
 
 /* ==============================
-   Styles
+   STYLES
 ================================ */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-
   header: {
     padding: spacing(6),
-    paddingBottom: spacing(10),
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
-    ...shadow.card,
   },
-
-  headerTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: colors.text,
-  },
-
-  headerSubtitle: {
-    fontSize: 14,
-    marginTop: 4,
-    color: colors.textMuted,
-  },
-
-  headerIcon: {
-    padding: spacing(3),
-    borderRadius: radius.lg,
-    backgroundColor: colors.primaryLight,
-  },
-
-  markAllWrapper: {
-    marginTop: spacing(4),
-    alignSelf: "flex-end",
-    backgroundColor: colors.primaryDark,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-    borderRadius: radius.lg,
-  },
-
-  markAllText: {
-    color: colors.card,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  filterRow: {
-    flexDirection: "row",
-    padding: spacing(4),
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-
-  filterBtn: {
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-    borderRadius: radius.lg,
-    backgroundColor: colors.primaryLight,
-    marginRight: spacing(3),
-  },
-
-  filterBtnActive: {
-    backgroundColor: colors.primaryDark,
-  },
-
-  filterText: {
-    fontWeight: "600",
-    color: colors.textMuted,
-  },
-
-  filterTextActive: {
-    color: colors.card,
-  },
-
+  headerTitle: { fontSize: 26, fontWeight: "800", color: colors.text },
+  headerSubtitle: { marginTop: 4, color: colors.textMuted },
   card: {
     backgroundColor: colors.card,
-    borderRadius: radius.lg,
     padding: spacing(4),
+    borderRadius: radius.lg,
     marginBottom: spacing(3),
     ...shadow.card,
-    position: "relative",
   },
-
-  cardUnread: {
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primaryDark,
-  },
-
-  row: { flexDirection: "row", alignItems: "flex-start" },
-
+  cardUnread: { borderLeftWidth: 4, borderLeftColor: colors.primaryDark },
+  row: { flexDirection: "row" },
   iconWrapper: {
     width: 44,
     height: 44,
     borderRadius: radius.lg,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
     marginRight: spacing(3),
   },
-
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.text,
-  },
-
-  cardTitleUnread: {
-    fontWeight: "800",
-  },
-
-  cardMessage: {
-    color: colors.textMuted,
-    marginVertical: spacing(1),
-  },
-
-  cardTime: {
-    color: colors.textMuted,
-    fontSize: 12,
-  },
-
-  deleteBtn: {
-    padding: spacing(1),
-    marginLeft: spacing(2),
-  },
-
+  cardTitle: { fontSize: 16, color: colors.text },
+  bold: { fontWeight: "800" },
+  cardMessage: { color: colors.textMuted },
+  cardTime: { fontSize: 12, color: colors.textMuted },
   unreadDot: {
-    position: "absolute",
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: colors.primaryDark,
-    top: spacing(3),
-    right: spacing(3),
+    position: "absolute",
+    top: 10,
+    right: 10,
   },
-
-  emptyWrapper: {
-    paddingVertical: spacing(20),
-    alignItems: "center",
-    opacity: 0.85,
-  },
-
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginTop: spacing(4),
-    color: colors.text,
-  },
-
-  emptySubtitle: {
-    fontSize: 14,
-    marginTop: spacing(2),
-    color: colors.textMuted,
-    textAlign: "center",
-    width: "70%",
-  },
+  emptyWrapper: { alignItems: "center", marginTop: 100 },
+  emptyTitle: { fontSize: 20, fontWeight: "700" },
+  emptySubtitle: { color: colors.textMuted },
 });

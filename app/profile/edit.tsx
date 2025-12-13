@@ -26,7 +26,7 @@ export default function EditProfileScreen() {
   const [gender, setGender] = useState("");
   const [phone, setPhone] = useState("");
 
-  // ⭐ avatar riêng để đồng bộ chính xác
+  
   const [avatar, setAvatar] = useState("https://i.ibb.co/Mff2W3V/default-avatar.png");
 
   /* ============================================

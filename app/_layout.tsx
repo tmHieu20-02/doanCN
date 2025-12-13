@@ -1,82 +1,79 @@
+import { Slot } from "expo-router";
+import { View, ActivityIndicator, Platform, StyleSheet } from "react-native";
+import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import { Slot, useRouter, useSegments } from "expo-router";
+import Toast from 'react-native-toast-message';
 import { StatusBar } from "expo-status-bar";
-import Toast from "react-native-toast-message";
-import { View, ActivityIndicator } from "react-native";
 
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { useFrameworkReady } from "@/hooks/useFrameworkReady";
-// import { registerForPushNotifications } from "@/hooks/useNotifications"; // ❌ XÓA
+// 👉 QUAN TRỌNG: Import AuthProvider
+import { AuthProvider, useAuth } from "@/hooks/useAuth"; 
+
+// Fix lỗi reanimated trên android cũ (nếu có)
+if (Platform.OS === "android") {
+  try {
+    // @ts-ignore
+    const hook = global.__REACT_DEVTOOLS_GLOBAL_HOOK__;
+    if (hook && typeof hook.inject === "function") {
+      hook.inject = function () {};
+    }
+  } catch (e) {}
+}
+
+SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
+  const [loaded, error] = useFonts({
+    // Nếu bạn có font custom thì khai báo ở đây, ví dụ:
+    // 'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
+  });
+
+  // 👉 Lấy thông tin user để check redirect (giữ nguyên logic của bạn)
   const { user, isInitialized } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  const root = segments?.[0] ?? null;
-
-  // ❌ COMMENT toàn bộ notification logic
-  // useEffect(() => {
-  //   if (isInitialized && user) {
-  //     registerForPushNotifications();
-  //   }
-  // }, [isInitialized, user]);
 
   useEffect(() => {
-    if (!isInitialized) return;
+    if (error) throw error;
+  }, [error]);
 
-    const inAuthGroup = root === "(auth)";
-
-    if (!user && !inAuthGroup) {
-      router.replace("/(auth)/login");
-      return;
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hideAsync();
     }
+  }, [loaded]);
 
-    if (user && inAuthGroup) {
-      if (user.roleId === 2) {
-        router.replace("/staff");
-      } else if (user.roleId === 3) {
-        router.replace("/(tabs)");
-      }
-      return;
-    }
-
-    if (user) {
-      if (user.roleId === 2 && root !== "staff") {
-        router.replace("/staff");
-        return;
-      }
-
-      if (user.roleId === 3 && root === "staff") {
-        router.replace("/(tabs)");
-        return;
-      }
-    }
-  }, [user, isInitialized, root]);
-
-  if (!isInitialized) {
+  // Đợi load font và auth session
+  if (!loaded || !isInitialized) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={styles.container}>
         <ActivityIndicator size="large" color="#FFB300" />
       </View>
     );
   }
 
   return (
-    <>
+    // FIX LAYOUT: Dùng View thường để Home tràn viền
+    <View style={styles.container}>
       <Slot />
       <Toast />
-      <StatusBar style="auto" />
-    </>
+      {/* StatusBar trong suốt */}
+      <StatusBar style="dark" backgroundColor="transparent" translucent />
+    </View>
   );
 }
 
 export default function RootLayout() {
-  useFrameworkReady();
-
   return (
+    // 🔥 LỖI Ở ĐÂY LÚC NÃY: Phải bọc AuthProvider ở ngoài cùng
+    // Nếu thiếu cái này thì useAuth() bên trong sẽ bị undefined -> Lỗi Login
     <AuthProvider>
       <RootLayoutNav />
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+});

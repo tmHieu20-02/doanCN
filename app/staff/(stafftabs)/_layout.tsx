@@ -70,6 +70,14 @@ export default function StaffTabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="index"
+        options={{
+          href: null,        // ẨN TAB "INDEX"
+          headerShown: false,
+        }}
+      />
+
     </Tabs>
   );
 }

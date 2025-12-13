@@ -21,7 +21,7 @@ export default function BookingDetail() {
   const [booking, setBooking] = useState<any>(null);
 
   // ==================================================
-  //  LOAD BOOKING ĐÚNG CHUẨN API /get-detail/:id
+  //  LOAD BOOKING /get-detail/:id
   // ==================================================
   const fetchBooking = async () => {
     try {
@@ -46,7 +46,7 @@ export default function BookingDetail() {
   }, [id]);
 
   // ==================================================
-  //  UPDATE BOOKING
+  //  UPDATE BOOKING (staff allowed fields only)
   // ==================================================
   const updateBooking = async () => {
     try {
@@ -68,7 +68,6 @@ export default function BookingDetail() {
 
       Alert.alert("Thành công", "Cập nhật booking thành công!");
       router.push("/staff/(stafftabs)/bookings?reload=1");
-
     } catch (err: any) {
       Alert.alert(
         "Lỗi",
@@ -78,12 +77,12 @@ export default function BookingDetail() {
   };
 
   // ==================================================
-  //  STAFF KHÔNG ĐƯỢC HỦY BOOKING THEO ID
+  //  STAFF NOT ALLOWED TO CANCEL BOOKING BY ID
   // ==================================================
   const cancelBooking = () => {
     Alert.alert(
       "Không thể hủy lịch",
-      "Nhân viên không được phép hủy lịch theo ID. Muốn hủy, hãy dùng chức năng 'Hủy tất cả lịch hẹn hôm nay' trong trang quản lý.",
+      "Nhân viên không được phép hủy lịch theo ID. Hãy dùng chức năng 'Hủy tất cả lịch hôm nay' trong trang quản lý.",
       [{ text: "OK" }]
     );
   };
@@ -112,6 +111,10 @@ export default function BookingDetail() {
       <Text style={styles.title}>Chỉnh sửa booking #{id}</Text>
 
       <View style={styles.card}>
+
+        {/* ---------------------------------------------- */}
+        {/* SERVICE ID */}
+        {/* ---------------------------------------------- */}
         <Text style={styles.label}>ID Dịch vụ</Text>
         <TextInput
           style={styles.input}
@@ -119,6 +122,35 @@ export default function BookingDetail() {
           onChangeText={(t) => setBooking({ ...booking, service_id: Number(t) })}
         />
 
+        {/* ---------------------------------------------- */}
+        {/* BOOKING TYPE (READ-ONLY) */}
+        {/* ---------------------------------------------- */}
+        <Text style={styles.label}>Loại lịch</Text>
+        <TextInput
+          editable={false}
+          style={[styles.input, styles.readonly]}
+          value={
+            booking.booking_type === "at_home"
+              ? "Dịch vụ tại nhà"
+              : "Dịch vụ tại cửa hàng"
+          }
+        />
+
+        {/* ADDRESS ONLY IF AT HOME */}
+        {booking.booking_type === "at_home" && (
+          <>
+            <Text style={styles.label}>Địa chỉ khách hàng</Text>
+            <TextInput
+              editable={false}
+              style={[styles.input, styles.readonly]}
+              value={booking.address_text || "Không có địa chỉ"}
+            />
+          </>
+        )}
+
+        {/* ---------------------------------------------- */}
+        {/* DATE */}
+        {/* ---------------------------------------------- */}
         <Text style={styles.label}>Ngày booking</Text>
         <TextInput
           style={styles.input}
@@ -126,6 +158,9 @@ export default function BookingDetail() {
           onChangeText={(t) => setBooking({ ...booking, booking_date: t })}
         />
 
+        {/* ---------------------------------------------- */}
+        {/* START TIME */}
+        {/* ---------------------------------------------- */}
         <Text style={styles.label}>Giờ bắt đầu</Text>
         <TextInput
           style={styles.input}
@@ -133,6 +168,9 @@ export default function BookingDetail() {
           onChangeText={(t) => setBooking({ ...booking, start_time: t })}
         />
 
+        {/* ---------------------------------------------- */}
+        {/* END TIME */}
+        {/* ---------------------------------------------- */}
         <Text style={styles.label}>Giờ kết thúc</Text>
         <TextInput
           style={styles.input}
@@ -140,6 +178,9 @@ export default function BookingDetail() {
           onChangeText={(t) => setBooking({ ...booking, end_time: t })}
         />
 
+        {/* ---------------------------------------------- */}
+        {/* STATUS */}
+        {/* ---------------------------------------------- */}
         <Text style={styles.label}>Trạng thái</Text>
         <TextInput
           style={styles.input}
@@ -147,6 +188,9 @@ export default function BookingDetail() {
           onChangeText={(t) => setBooking({ ...booking, status: t })}
         />
 
+        {/* ---------------------------------------------- */}
+        {/* NOTE */}
+        {/* ---------------------------------------------- */}
         <Text style={styles.label}>Ghi chú</Text>
         <TextInput
           style={[styles.input, { height: 80 }]}
@@ -170,6 +214,7 @@ export default function BookingDetail() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#F3F4F6" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
+
   title: { fontSize: 24, fontWeight: "700", marginBottom: 16 },
 
   card: {
@@ -195,6 +240,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D1D5DB",
     marginBottom: 14,
+  },
+
+  readonly: {
+    backgroundColor: "#E5E7EB",
+    color: "#6B7280",
   },
 
   saveBtn: {
