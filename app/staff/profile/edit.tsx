@@ -10,20 +10,19 @@ import {
 } from "react-native";
 import { useState, useEffect } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
-// 👉 Import SafeAreaView
 import { SafeAreaView } from "react-native-safe-area-context";
 import api from "@/utils/api";
 import * as SecureStore from "expo-secure-store";
 import { useAuth } from "@/hooks/useAuth";
-// 👉 Import icon
 import { Lock } from "lucide-react-native";
-// 👉 Import colors từ theme (Giữ nguyên cái này)
-import { colors } from "@/ui/theme";
 
 export default function EditStaffProfile() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ selectedLat?: string; selectedLng?: string }>();
-  const { user, updateUser } = useAuth();
+  const params = useLocalSearchParams<{
+    selectedLat?: string;
+    selectedLng?: string;
+  }>();
+  const { updateUser } = useAuth();
 
   const [storeName, setStoreName] = useState("");
   const [storeAddress, setStoreAddress] = useState("");
@@ -34,12 +33,13 @@ export default function EditStaffProfile() {
   const [storeLat, setStoreLat] = useState("");
   const [storeLng, setStoreLng] = useState("");
 
-  // LOAD PROFILE
+  /* =========================
+     LOAD PROFILE
+  ========================= */
   useEffect(() => {
     const load = async () => {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const data = stored ? JSON.parse(stored) : {};
-
       const profile = data?.staffProfile;
 
       if (profile) {
@@ -56,23 +56,32 @@ export default function EditStaffProfile() {
     load();
   }, []);
 
-  // TỰ ĐỘNG CẬP NHẬT TỪ MAP PICKER
+  /* =========================
+     UPDATE FROM MAP PICKER
+  ========================= */
   useEffect(() => {
     if (params.selectedLat && params.selectedLng) {
       setStoreLat(String(params.selectedLat));
       setStoreLng(String(params.selectedLng));
-      Alert.alert("Thành công", "Đã cập nhật tọa độ từ bản đồ.");
+      Alert.alert("Thành công", "Đã cập nhật vị trí từ bản đồ.");
     }
   }, [params.selectedLat, params.selectedLng]);
 
-  // SAVE PROFILE
+  /* =========================
+     SAVE PROFILE
+  ========================= */
   const handleSave = async () => {
     if (!storeName.trim()) {
-      return Alert.alert("Thiếu thông tin", "Tên salon không được để trống.");
+      return Alert.alert(
+        "Thiếu thông tin",
+        "Tên địa điểm làm việc không được để trống."
+      );
     }
 
-    if (storeLat && isNaN(Number(storeLat))) return Alert.alert("Lỗi", "Lat không hợp lệ.");
-    if (storeLng && isNaN(Number(storeLng))) return Alert.alert("Lỗi", "Lng không hợp lệ.");
+    if (storeLat && isNaN(Number(storeLat)))
+      return Alert.alert("Lỗi", "Lat không hợp lệ.");
+    if (storeLng && isNaN(Number(storeLng)))
+      return Alert.alert("Lỗi", "Lng không hợp lệ.");
 
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
@@ -96,10 +105,13 @@ export default function EditStaffProfile() {
         const saved = stored ? JSON.parse(stored) : {};
         saved.staffProfile = res.data.profile;
 
-        await SecureStore.setItemAsync("my-user-session", JSON.stringify(saved));
+        await SecureStore.setItemAsync(
+          "my-user-session",
+          JSON.stringify(saved)
+        );
         await updateUser({ staffProfile: res.data.profile });
 
-        Alert.alert("Thành công", "Đã cập nhật thông tin salon.");
+        Alert.alert("Thành công", "Đã cập nhật thông tin làm việc.");
         router.back();
       } else {
         Alert.alert("Lỗi", res.data?.mes || "Không thể cập nhật.");
@@ -109,84 +121,82 @@ export default function EditStaffProfile() {
     }
   };
 
+  /* =========================
+     UI
+  ========================= */
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: "#F8FAFC" }}
+      edges={["top", "left", "right"]}
+    >
       <ScrollView style={styles.contentContainer}>
-        <Text style={styles.header}>Chỉnh sửa thông tin salon</Text>
+        <Text style={styles.header}>Thông tin làm việc</Text>
 
-        {/* TÊN SALON */}
-        <Text style={styles.label}>Tên salon</Text>
+        <Text style={styles.label}>Tên địa điểm / cửa hàng</Text>
         <TextInput
           style={styles.input}
           value={storeName}
           onChangeText={setStoreName}
-          placeholder="Nhập tên salon"
+          placeholder="VD: Barber Phát Đạt, Spa Minh Anh..."
         />
 
-        {/* ĐỊA CHỈ */}
-        <Text style={styles.label}>Địa chỉ salon</Text>
+        <Text style={styles.label}>Địa chỉ làm việc</Text>
         <TextInput
           style={styles.input}
           value={storeAddress}
           onChangeText={setStoreAddress}
-          placeholder="Nhập địa chỉ salon"
+          placeholder="Nhập địa chỉ nơi cung cấp dịch vụ"
         />
 
-        {/* KINH NGHIỆM */}
         <Text style={styles.label}>Kinh nghiệm (năm)</Text>
         <TextInput
           style={styles.input}
           value={experience}
           onChangeText={setExperience}
           keyboardType="numeric"
-          placeholder="VD: 5"
+          placeholder="VD: 3"
         />
 
-        {/* GIỚI THIỆU */}
-        <Text style={styles.label}>Giới thiệu</Text>
+        <Text style={styles.label}>Giới thiệu ngắn</Text>
         <TextInput
           style={[styles.input, { height: 100 }]}
           value={bio}
           onChangeText={setBio}
           multiline
+          placeholder="Mô tả kinh nghiệm, kỹ năng, phong cách làm việc..."
         />
 
-        {/* VỊ TRÍ SALON */}
-        <Text style={styles.label}>Vị trí salon</Text>
+        <Text style={styles.label}>Vị trí làm việc</Text>
         <View style={styles.locationRow}>
           <View style={styles.lockedInputWrapper}>
             <TextInput
-              style={[styles.locationInput, { flex: 1 }]}
+              style={styles.locationInput}
               placeholder="Lat"
               value={storeLat}
-              onChangeText={setStoreLat}
-              keyboardType="numeric"
               editable={false}
             />
-             <Lock size={16} color="#6B7280" style={styles.lockIcon} />
+            <Lock size={16} color="#6B7280" style={styles.lockIcon} />
           </View>
 
           <View style={{ width: 10 }} />
 
           <View style={styles.lockedInputWrapper}>
             <TextInput
-              style={[styles.locationInput, { flex: 1 }]}
+              style={styles.locationInput}
               placeholder="Lng"
               value={storeLng}
-              onChangeText={setStoreLng}
-              keyboardType="numeric"
               editable={false}
             />
             <Lock size={16} color="#6B7280" style={styles.lockIcon} />
           </View>
         </View>
 
-        {/* OPEN MAP PICKER */}
+        {/* ✅ FIX: PUSH MODAL — KHÔNG ĐỔI TAB, KHÔNG RESET */}
         <TouchableOpacity
           style={styles.mapBtn}
           onPress={() =>
             router.push({
-              pathname: "/staff/map-picker",
+              pathname: "/staff/modal/map-picker",
               params: {
                 lat: storeLat || "10.762622",
                 lng: storeLng || "106.660172",
@@ -194,22 +204,21 @@ export default function EditStaffProfile() {
             })
           }
         >
-          <Text style={styles.mapText}>Chọn trên bản đồ 🗺️</Text>
+          <Text style={styles.mapText}>Chọn vị trí trên bản đồ</Text>
         </TouchableOpacity>
 
-        {/* ACTIVE SWITCH */}
         <View style={styles.switchRow}>
-          <Text style={styles.label}>Đang hoạt động</Text>
-          <Switch 
-            value={isActive} 
+          <Text style={styles.label}>Đang nhận khách</Text>
+          <Switch
+            value={isActive}
             onValueChange={setIsActive}
-            trackColor={{ false: '#767577', true: '#2563EB' }}
+            trackColor={{ false: "#767577", true: "#2563EB" }}
             thumbColor={isActive ? "#fff" : "#f4f3f4"}
           />
         </View>
 
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveText}>Lưu thay đổi</Text>
+          <Text style={styles.saveText}>Lưu thông tin</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -218,13 +227,24 @@ export default function EditStaffProfile() {
   );
 }
 
-// FIX: Sử dụng mã màu trực tiếp để tránh lỗi Duplicate declaration
+/* =========================
+   STYLES
+========================= */
 const styles = StyleSheet.create({
   contentContainer: { flex: 1, padding: 18, backgroundColor: "#F8FAFC" },
-  header: { fontSize: 22, fontWeight: "700", marginBottom: 20, color: "#1F2937" },
-
-  label: { fontSize: 14, fontWeight: "600", marginTop: 14, marginBottom: 6, color: "#1F2937" },
-
+  header: {
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 20,
+    color: "#1F2937",
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 14,
+    marginBottom: 6,
+    color: "#1F2937",
+  },
   input: {
     backgroundColor: "#fff",
     borderColor: "#E5E7EB",
@@ -235,21 +255,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#1F2937",
   },
-
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 4,
-  },
-  
-  lockedInputWrapper: {
-    flex: 1,
-    position: 'relative',
-    justifyContent: 'center',
-  },
-
+  locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
+  lockedInputWrapper: { flex: 1, position: "relative" },
   locationInput: {
-    backgroundColor: "#E5E7EB", 
+    backgroundColor: "#E5E7EB",
     borderColor: "#D1D5DB",
     borderWidth: 1,
     borderRadius: 10,
@@ -259,43 +268,27 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     paddingRight: 40,
   },
-  
-  lockIcon: {
-      position: 'absolute',
-      right: 12,
-  },
-
+  lockIcon: { position: "absolute", right: 12, top: 12 },
   mapBtn: {
     marginTop: 16,
     backgroundColor: "#2563EB",
     paddingVertical: 13,
     borderRadius: 10,
     alignItems: "center",
-    flexDirection: 'row',
-    justifyContent: 'center',
   },
-
-  mapText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-
+  mapText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   switchRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 22,
     alignItems: "center",
   },
-
   saveBtn: {
     marginTop: 24,
     backgroundColor: "#2563EB",
     paddingVertical: 14,
     borderRadius: 10,
   },
-
   saveText: {
     color: "#fff",
     fontSize: 15,

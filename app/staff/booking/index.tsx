@@ -1,5 +1,14 @@
-import { Redirect } from "expo-router";
+import { useEffect } from "react";
+import { useRouter } from "expo-router";
 
 export default function BookingIndex() {
-  return <Redirect href="/staff/(tabs)/bookings" />;
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace({
+      pathname: "/staff/(tabs)/bookings",
+    } as any);
+  }, []);
+
+  return null;
 }

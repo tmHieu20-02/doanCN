@@ -13,7 +13,7 @@ import {
 
 import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import { Star, Heart } from "lucide-react-native";
+import { Star, Heart, ArrowLeft } from "lucide-react-native";
 
 export default function FavoriteScreen() {
   const [favorites, setFavorites] = useState<any[]>([]);
@@ -55,7 +55,6 @@ export default function FavoriteScreen() {
     loadFavorites();
   }, []);
 
-  // reload khi quay lại màn
   useFocusEffect(
     useCallback(() => {
       loadFavorites();
@@ -63,7 +62,7 @@ export default function FavoriteScreen() {
   );
 
   /* ======================================
-     REMOVE FAVORITE (FE GỬI service_id)
+     REMOVE FAVORITE
   ====================================== */
   const removeFavorite = async (service_id: number) => {
     const session = await SecureStore.getItemAsync("my-user-session");
@@ -91,11 +90,10 @@ export default function FavoriteScreen() {
 
     return (
       <View style={styles.card}>
-        {/* ❤️ HEART – REMOVE FAVORITE */}
+        {/* ❤️ REMOVE */}
         <TouchableOpacity
           style={styles.heart}
           onPress={async () => {
-            // Optimistic UI
             setFavorites((prev) =>
               prev.filter((f) => f.service_id !== item.service_id)
             );
@@ -104,14 +102,13 @@ export default function FavoriteScreen() {
 
             if (res.err !== 0) {
               Alert.alert("Lỗi", "Không thể xoá yêu thích");
-              loadFavorites(); // rollback nếu BE fail
+              loadFavorites();
             }
           }}
         >
           <Heart size={20} color="#FF3B30" fill="#FF3B30" />
         </TouchableOpacity>
 
-        {/* CARD CLICK */}
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() =>
@@ -161,7 +158,17 @@ export default function FavoriteScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>Dịch vụ yêu thích</Text>
+      {/* ===== HEADER ===== */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => router.back()}
+        >
+          <ArrowLeft size={22} color="#222" />
+        </TouchableOpacity>
+
+        <Text style={styles.header}>Dịch vụ yêu thích</Text>
+      </View>
 
       {loading && (
         <View style={{ marginTop: 20 }}>
@@ -192,10 +199,20 @@ export default function FavoriteScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 18, backgroundColor: "#FAFAFA" },
 
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  backBtn: {
+    padding: 6,
+    marginRight: 8,
+  },
+
   header: {
     fontSize: 24,
     fontWeight: "800",
-    marginBottom: 14,
     color: "#222",
   },
 

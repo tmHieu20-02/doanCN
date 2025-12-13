@@ -8,12 +8,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  Bell,
-  Calendar,
-  CheckCircle,
-  X,
-} from "lucide-react-native";
+import { Bell, Calendar, CheckCircle, X } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
@@ -36,42 +31,67 @@ type NotificationItem = {
 };
 
 /* ==============================
-   API HELPERS
+   API HELPERS (MATCH BE)
 ================================ */
 const getToken = async () => {
   const session = await SecureStore.getItemAsync("my-user-session");
-  return session ? JSON.parse(session).token : null;
+  const token = session ? JSON.parse(session).token : null;
+  console.log("🔔 [NOTI] TOKEN:", token);
+  return token;
 };
 
 const fetchNotifications = async (): Promise<any[]> => {
   const token = await getToken();
-  // Đảm bảo URL này đúng với server của bạn
-  const res = await fetch(
-    "https://phatdat.store/api/v1/notification/get-all",
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+
+  console.log("🔔 [NOTI] FETCH START");
+
+  const res = await fetch("https://phatdat.store/api/v1/notification/get", {
+  headers: {
+    Authorization: `Bearer ${token}`,
+  },
+});
+
+
+  console.log("🔔 [NOTI] STATUS:", res.status);
+
   const json = await res.json();
-  return json.data || [];
+  console.log("🔔 [NOTI] RESPONSE JSON:", json);
+
+  return json.notifications || [];
 };
 
 const apiMarkRead = async (id: number) => {
   const token = await getToken();
+  console.log("🔔 [NOTI] MARK READ:", id);
+
   await fetch(
     `https://phatdat.store/api/v1/notification/read/${id}`,
-    { method: "PUT", headers: { Authorization: `Bearer ${token}` } }
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
   );
 };
 
 const apiDelete = async (id: number) => {
   const token = await getToken();
+  console.log("🔔 [NOTI] DELETE:", id);
+
   await fetch(
     `https://phatdat.store/api/v1/notification/${id}`,
-    { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
   );
 };
 
 /* ==============================
-   HELPERS (PHẦN BẠN ĐANG THIẾU)
+   HELPERS
 ================================ */
 const formatTime = (createdAt?: string) => {
   if (!createdAt) return "";
@@ -109,7 +129,7 @@ const getColorByType = (type?: string): string => {
 };
 
 /* ==============================
-   EMPTY STATE COMPONENT (PHẦN BẠN ĐANG THIẾU)
+   EMPTY STATE
 ================================ */
 const EmptyState = ({
   icon,
@@ -128,31 +148,35 @@ const EmptyState = ({
 );
 
 /* ==============================
-   MAP API → UI
+   MAP API → UI (FIXED)
 ================================ */
 const mapNotificationFromApi = (n: any): NotificationItem => {
-  let bookingId = n.bookingId;
+  console.log("🔔 [NOTI] MAP RAW ITEM:", n);
 
-  if (!bookingId && typeof n.data === "object") {
-    bookingId = n.data?.bookingId;
-  }
+  let bookingId: string | undefined;
 
-  if (!bookingId && typeof n.data === "string") {
-    try {
-      bookingId = JSON.parse(n.data)?.bookingId;
-    } catch {}
+  if (n.booking_id) bookingId = String(n.booking_id);
+
+  if (!bookingId && n.data) {
+    if (typeof n.data === "object") {
+      bookingId = n.data.bookingId;
+    } else if (typeof n.data === "string") {
+      try {
+        bookingId = JSON.parse(n.data)?.bookingId;
+      } catch {}
+    }
   }
 
   return {
     id: n.id,
     type: n.type,
     title: n.title,
-    message: n.message,
+    message: n.body,              // ✅ FIX: BE dùng body
     time: formatTime(n.createdAt),
-    read: !!n.isRead,
+    read: Boolean(n.is_read),     // ✅ FIX: BE dùng is_read
     icon: getIconName(n.type),
     color: getColorByType(n.type),
-    bookingId: bookingId ? String(bookingId) : undefined,
+    bookingId,
   };
 };
 
@@ -161,7 +185,6 @@ const mapNotificationFromApi = (n: any): NotificationItem => {
 ================================ */
 export default function NotificationsScreen() {
   const [list, setList] = useState<NotificationItem[]>([]);
-  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
 
   useEffect(() => {
     loadData();
@@ -170,34 +193,34 @@ export default function NotificationsScreen() {
   const loadData = async () => {
     try {
       const raw = await fetchNotifications();
+      console.log("🔔 [NOTI] RAW LIST:", raw);
+
       if (Array.isArray(raw)) {
-        setList(raw.map(mapNotificationFromApi));
+        const mapped = raw.map(mapNotificationFromApi);
+        console.log("🔔 [NOTI] MAPPED LIST:", mapped);
+        setList(mapped);
       }
     } catch (error) {
-      console.log("Error loading notifications:", error);
+      console.log("❌ [NOTI] LOAD ERROR:", error);
     }
   };
 
   const unreadCount = list.filter((n) => !n.read).length;
 
-  const filteredList =
-    filter === "all"
-      ? list
-      : filter === "unread"
-      ? list.filter((n) => !n.read)
-      : list.filter((n) => n.read);
-
   const openDetail = async (item: NotificationItem) => {
+    console.log("🔔 [NOTI] OPEN:", item);
+
     if (!item.read) {
       setList((prev) =>
-        prev.map((n) => (n.id === item.id ? { ...n, read: true } : n))
+        prev.map((n) =>
+          n.id === item.id ? { ...n, read: true } : n
+        )
       );
       await apiMarkRead(item.id);
     }
-    
+
     if (!item.bookingId) return;
 
-    // SỬA LỖI ROUTER: Thêm 'as any' để tránh báo lỗi đỏ
     router.push({
       pathname: "/booking/[id]",
       params: { id: item.bookingId },
@@ -214,11 +237,10 @@ export default function NotificationsScreen() {
           text: "Xóa",
           style: "destructive",
           onPress: async () => {
-            setList((prev) => prev.filter((item) => item.id !== id));
+            setList((prev) => prev.filter((i) => i.id !== id));
             try {
               await apiDelete(id);
-            } catch (error) {
-              console.log("Error deleting:", error);
+            } catch {
               loadData();
             }
           },
@@ -256,7 +278,10 @@ export default function NotificationsScreen() {
           <Text style={styles.cardTime}>{item.time}</Text>
         </View>
 
-        <TouchableOpacity onPress={() => handleDelete(item.id, item.title)} style={{ padding: 4 }}>
+        <TouchableOpacity
+          onPress={() => handleDelete(item.id, item.title)}
+          style={{ padding: 4 }}
+        >
           <X size={16} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
@@ -279,9 +304,9 @@ export default function NotificationsScreen() {
         </Text>
       </LinearGradient>
 
-      {filteredList.length ? (
+      {list.length ? (
         <FlatList
-          data={filteredList}
+          data={list}
           renderItem={renderItem}
           keyExtractor={(i) => i.id.toString()}
           contentContainerStyle={{ padding: 20 }}

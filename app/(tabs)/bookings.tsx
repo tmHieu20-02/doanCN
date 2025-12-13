@@ -643,13 +643,13 @@ const styles = StyleSheet.create({
   },
 
   bookingFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 14,
-  },
+  flexDirection: 'column', // ✅ FIX TRÀN
+  borderTopWidth: 1,
+  borderTopColor: '#F3F4F6',
+  paddingTop: 14,
+  gap: 12,
+},
+
 
   price: {
     fontSize: 17,
@@ -658,9 +658,12 @@ const styles = StyleSheet.create({
   },
 
   actionButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  flexWrap: 'wrap', // ✅ FIX TRÀN
+  gap: 8,
+},
+
 
   iconButton: {
     width: 38,
