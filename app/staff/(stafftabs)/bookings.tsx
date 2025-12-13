@@ -10,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 import axios from "axios";
-import { cancelAllBookings as cancelAllService } from "../serviceId/bookingService";
+import { cancelAllBookings as cancelAllService } from "services/bookingService";
 import * as SecureStore from "expo-secure-store";
 
 type BookingStatus =

@@ -5,17 +5,14 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  // LOẠI BỎ SafeAreaView từ react-native
-  // SafeAreaView, 
+  Alert,
 } from "react-native";
-// IMPORT SafeAreaView TỪ CONTEXT
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Bell,
   Calendar,
   CheckCircle,
   X,
-  Settings,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
@@ -39,25 +36,6 @@ type NotificationItem = {
 };
 
 /* ==============================
-   EMPTY STATE
-================================ */
-const EmptyState = ({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-}) => (
-  <View style={styles.emptyWrapper}>
-    {icon}
-    <Text style={styles.emptyTitle}>{title}</Text>
-    <Text style={styles.emptySubtitle}>{subtitle}</Text>
-  </View>
-);
-
-/* ==============================
    API HELPERS
 ================================ */
 const getToken = async () => {
@@ -67,6 +45,7 @@ const getToken = async () => {
 
 const fetchNotifications = async (): Promise<any[]> => {
   const token = await getToken();
+  // Đảm bảo URL này đúng với server của bạn
   const res = await fetch(
     "https://phatdat.store/api/v1/notification/get-all",
     { headers: { Authorization: `Bearer ${token}` } }
@@ -83,14 +62,6 @@ const apiMarkRead = async (id: number) => {
   );
 };
 
-const apiMarkAll = async () => {
-  const token = await getToken();
-  await fetch(
-    "https://phatdat.store/api/v1/notification/read-all",
-    { method: "PUT", headers: { Authorization: `Bearer ${token}` } }
-  );
-};
-
 const apiDelete = async (id: number) => {
   const token = await getToken();
   await fetch(
@@ -100,7 +71,7 @@ const apiDelete = async (id: number) => {
 };
 
 /* ==============================
-   HELPERS
+   HELPERS (PHẦN BẠN ĐANG THIẾU)
 ================================ */
 const formatTime = (createdAt?: string) => {
   if (!createdAt) return "";
@@ -136,6 +107,25 @@ const getColorByType = (type?: string): string => {
       return colors.primary;
   }
 };
+
+/* ==============================
+   EMPTY STATE COMPONENT (PHẦN BẠN ĐANG THIẾU)
+================================ */
+const EmptyState = ({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+}) => (
+  <View style={styles.emptyWrapper}>
+    {icon}
+    <Text style={styles.emptyTitle}>{title}</Text>
+    <Text style={styles.emptySubtitle}>{subtitle}</Text>
+  </View>
+);
 
 /* ==============================
    MAP API → UI
@@ -178,8 +168,14 @@ export default function NotificationsScreen() {
   }, []);
 
   const loadData = async () => {
-    const raw = await fetchNotifications();
-    setList(raw.map(mapNotificationFromApi));
+    try {
+      const raw = await fetchNotifications();
+      if (Array.isArray(raw)) {
+        setList(raw.map(mapNotificationFromApi));
+      }
+    } catch (error) {
+      console.log("Error loading notifications:", error);
+    }
   };
 
   const unreadCount = list.filter((n) => !n.read).length;
@@ -192,13 +188,43 @@ export default function NotificationsScreen() {
       : list.filter((n) => n.read);
 
   const openDetail = async (item: NotificationItem) => {
-    if (!item.read) await apiMarkRead(item.id);
+    if (!item.read) {
+      setList((prev) =>
+        prev.map((n) => (n.id === item.id ? { ...n, read: true } : n))
+      );
+      await apiMarkRead(item.id);
+    }
+    
     if (!item.bookingId) return;
 
+    // SỬA LỖI ROUTER: Thêm 'as any' để tránh báo lỗi đỏ
     router.push({
-      pathname: "../booking/[id]",
+      pathname: "/booking/[id]",
       params: { id: item.bookingId },
-    });
+    } as any);
+  };
+
+  const handleDelete = (id: number, title: string) => {
+    Alert.alert(
+      "Xác nhận xóa",
+      `Bạn có chắc chắn muốn xóa thông báo: "${title}" không?`,
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Xóa",
+          style: "destructive",
+          onPress: async () => {
+            setList((prev) => prev.filter((item) => item.id !== id));
+            try {
+              await apiDelete(id);
+            } catch (error) {
+              console.log("Error deleting:", error);
+              loadData();
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderItem = ({ item }: { item: NotificationItem }) => (
@@ -230,7 +256,7 @@ export default function NotificationsScreen() {
           <Text style={styles.cardTime}>{item.time}</Text>
         </View>
 
-        <TouchableOpacity onPress={() => apiDelete(item.id)}>
+        <TouchableOpacity onPress={() => handleDelete(item.id, item.title)} style={{ padding: 4 }}>
           <X size={16} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
@@ -240,8 +266,7 @@ export default function NotificationsScreen() {
   );
 
   return (
-    // FIX: Dùng SafeAreaView từ Context để bảo vệ tai thỏ
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <LinearGradient
         colors={[colors.primary, colors.primaryAlt]}
         style={styles.header}

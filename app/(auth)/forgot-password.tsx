@@ -11,9 +11,10 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image, // Thêm Image
 } from "react-native";
 import { useRouter } from "expo-router";
-import { MotiView, MotiImage } from "moti";
+// import { MotiView, MotiImage } from "moti"; // XÓA/COMMENT DÒNG NÀY
 import api from "@/utils/api";
 
 export default function ForgotPasswordScreen() {
@@ -22,6 +23,7 @@ export default function ForgotPasswordScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleSendOtp = async () => {
+    // ... (Giữ nguyên logic)
     if (!/^[0-9]{10}$/.test(numberPhone.trim())) {
       Alert.alert("Lỗi", "Số điện thoại phải gồm đúng 10 số.");
       return;
@@ -35,7 +37,6 @@ export default function ForgotPasswordScreen() {
       });
 
       if (res.data.err === 0) {
-        // support both reset_token and resetToken keys returned by backend
         const token = res.data.reset_token ?? res.data.resetToken ?? res.data.resetToken;
         if (!token) {
           console.warn('Forgot: server returned success but no reset token', res.data);
@@ -51,12 +52,10 @@ export default function ForgotPasswordScreen() {
         Alert.alert("Lỗi", res.data.mes);
       }
     } catch (e) {
-  const err = e as any; 
-  console.log("FORGOT ERROR:", err?.response?.data || err);
-  Alert.alert("Lỗi", "Không thể gửi OTP.");
-}
-
- finally {
+      const err = e as any;
+      console.log("FORGOT ERROR:", err?.response?.data || err);
+      Alert.alert("Lỗi", "Không thể gửi OTP.");
+    } finally {
       setLoading(false);
     }
   };
@@ -68,22 +67,17 @@ export default function ForgotPasswordScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView showsVerticalScrollIndicator={false}>
-
-          {/* ================= IMAGE ================= */}
-          <MotiView
+          {/* ================= IMAGE - Dùng View thường thay thế ================= */}
+          <View // THAY THẾ MOTIVIEW
             style={styles.imageWrapper}
-            from={{ opacity: 0, translateY: -30 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ duration: 600 }}
+            // XÓA CÁC PROPS ANIMATION (from, animate, transition)
           >
-            <MotiImage
+            <Image // THAY THẾ MOTIIMAGE
               source={require("../../assets/images/gemini.png")}
               style={styles.image}
-              from={{ scale: 1.05 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 700 }}
+              // XÓA CÁC PROPS ANIMATION
             />
-          </MotiView>
+          </View>
 
           {/* ================= TITLE ================= */}
           <View style={styles.titleWrapper}>
@@ -93,12 +87,10 @@ export default function ForgotPasswordScreen() {
             </Text>
           </View>
 
-          {/* ================= FORM ================= */}
-          <MotiView
+          {/* ================= FORM - Dùng View thường thay thế ================= */}
+          <View // THAY THẾ MOTIVIEW
             style={styles.card}
-            from={{ opacity: 0, translateY: 50 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ duration: 500, delay: 100 }}
+            // XÓA CÁC PROPS ANIMATION
           >
             <View style={styles.inputWrapper}>
               <TextInput
@@ -123,13 +115,12 @@ export default function ForgotPasswordScreen() {
                 <Text style={styles.buttonText}>Gửi mã OTP</Text>
               )}
             </TouchableOpacity>
-          </MotiView>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
