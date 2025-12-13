@@ -1,15 +1,39 @@
+// app/_layout.tsx
+
 import { Slot } from "expo-router";
 import { View, ActivityIndicator, Platform, StyleSheet } from "react-native";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import Toast from 'react-native-toast-message';
+import Toast from "react-native-toast-message";
 import { StatusBar } from "expo-status-bar";
 
-// 👉 QUAN TRỌNG: Import AuthProvider
-import { AuthProvider, useAuth } from "@/hooks/useAuth"; 
+// 👉 AUTH
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 
-// Fix lỗi reanimated trên android cũ (nếu có)
+// 👉 NOTIFICATIONS (FIX FOREGROUND)
+import * as Notifications from "expo-notifications";
+import type { NotificationBehavior } from "expo-notifications";
+
+/* ============================================================
+   🔔 GLOBAL NOTIFICATION HANDLER
+   ⚠️ PHẢI ĐẶT NGOÀI COMPONENT
+============================================================ */
+Notifications.setNotificationHandler({
+  handleNotification: async () => {
+  console.log("🔔 [GLOBAL] Notification received (foreground enabled)");
+  return {
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  } as NotificationBehavior;
+},
+
+});
+
+/* ============================================================
+   Fix lỗi reanimated trên android cũ (giữ nguyên)
+============================================================ */
 if (Platform.OS === "android") {
   try {
     // @ts-ignore
@@ -20,15 +44,15 @@ if (Platform.OS === "android") {
   } catch (e) {}
 }
 
+/* ============================================================ */
+
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
   const [loaded, error] = useFonts({
-    // Nếu bạn có font custom thì khai báo ở đây, ví dụ:
-    // 'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
+    // custom fonts nếu có
   });
 
-  // 👉 Lấy thông tin user để check redirect (giữ nguyên logic của bạn)
   const { user, isInitialized } = useAuth();
 
   useEffect(() => {
@@ -41,7 +65,6 @@ function RootLayoutNav() {
     }
   }, [loaded]);
 
-  // Đợi load font và auth session
   if (!loaded || !isInitialized) {
     return (
       <View style={styles.container}>
@@ -51,11 +74,9 @@ function RootLayoutNav() {
   }
 
   return (
-    // FIX LAYOUT: Dùng View thường để Home tràn viền
     <View style={styles.container}>
       <Slot />
       <Toast />
-      {/* StatusBar trong suốt */}
       <StatusBar style="dark" backgroundColor="transparent" translucent />
     </View>
   );
@@ -63,13 +84,13 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    // 🔥 LỖI Ở ĐÂY LÚC NÃY: Phải bọc AuthProvider ở ngoài cùng
-    // Nếu thiếu cái này thì useAuth() bên trong sẽ bị undefined -> Lỗi Login
     <AuthProvider>
       <RootLayoutNav />
     </AuthProvider>
   );
 }
+
+/* ============================================================ */
 
 const styles = StyleSheet.create({
   container: {

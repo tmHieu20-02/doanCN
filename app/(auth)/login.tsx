@@ -91,48 +91,81 @@ export default function LoginScreen() {
   const [resendLoadingReset, setResendLoadingReset] = useState(false);
   const resetShakeAnim = useRef(new Animated.Value(0)).current;
 
-  /* ============================= LOGIN ============================= */
   const handleSignIn = async () => {
-    if (!numberPhone || !password) {
-      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin.");
-      return;
-    }
-    if (!/^[0-9]{10}$/.test(numberPhone.trim())) {
-      Alert.alert("Lỗi", "Số điện thoại phải gồm đúng 10 số.");
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert("Lỗi", "Mật khẩu quá ngắn.");
-      return;
-    }
-    setLoginLoading(true);
-    try {
-      const result = await signIn({
-        numberPhone: numberPhone.trim(),
-        password: password.trim(),
-      });
-      if (!result.success) {
-        Alert.alert(
-          "Đăng nhập thất bại",
-          result.message || "Kiểm tra lại thông tin."
-        );
-        return;
-      }
-      try {
-        const expoToken = await getExpoPushToken();
-        if (expoToken) {
-          await registerDeviceToken(expoToken);
-        }
-      } catch (e) {
-        console.log("❌ REGISTER DEVICE TOKEN ERROR:", e);
-      }
-    } catch (err) {
-      Alert.alert("Lỗi", "Có lỗi hệ thống xảy ra.");
-    } finally {
-      setLoginLoading(false);
-    }
-  };
+  console.log("🔐 [LOGIN] START");
 
+  if (!numberPhone || !password) {
+    Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin.");
+    return;
+  }
+  if (!/^[0-9]{10}$/.test(numberPhone.trim())) {
+    Alert.alert("Lỗi", "Số điện thoại phải gồm đúng 10 số.");
+    return;
+  }
+  if (password.length < 6) {
+    Alert.alert("Lỗi", "Mật khẩu quá ngắn.");
+    return;
+  }
+
+  setLoginLoading(true);
+
+  try {
+    console.log("🔐 [LOGIN] CALL signIn()", {
+      numberPhone: numberPhone.trim(),
+    });
+
+    const result = await signIn({
+      numberPhone: numberPhone.trim(),
+      password: password.trim(),
+    });
+
+    console.log("🔐 [LOGIN] signIn RESULT:", result);
+
+    if (!result.success || !result.data) {
+      console.log("❌ [LOGIN] FAILED:", result.message);
+      Alert.alert(
+        "Đăng nhập thất bại",
+        result.message || "Kiểm tra lại thông tin."
+      );
+      return;
+    }
+
+    // ================= JWT LOG =================
+    const accessToken = result.data.token;
+
+    console.log("🟢 [LOGIN] SUCCESS");
+    console.log("🟢 [LOGIN] USER ID:", result.data.id);
+    console.log("🟢 [LOGIN] ROLE ID:", result.data.roleId);
+    console.log("🟢 [LOGIN] JWT:", accessToken);
+
+    if (!accessToken) {
+      console.log("❌ [LOGIN] JWT IS NULL");
+      return;
+    }
+
+    // ================= REGISTER DEVICE TOKEN =================
+    try {
+      console.log("📲 [PUSH] REGISTER DEVICE TOKEN START");
+
+      await registerDeviceToken(accessToken);
+
+      console.log("✅ [PUSH] REGISTER DEVICE TOKEN DONE");
+    } catch (e: any) {
+      console.log(
+        "❌ [PUSH] REGISTER DEVICE TOKEN ERROR:",
+        e?.response?.data || e.message
+      );
+    }
+    // =========================================================
+
+  } catch (err: any) {
+    console.log("❌ [LOGIN] SYSTEM ERROR:", err?.message || err);
+    Alert.alert("Lỗi", "Có lỗi hệ thống xảy ra.");
+  } finally {
+    setLoginLoading(false);
+    console.log("🔐 [LOGIN] END");
+  }
+};
 
   /* ============================= FORGOT PASSWORD ============================= */
   const handleSendOtp = async () => {
