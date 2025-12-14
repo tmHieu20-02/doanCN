@@ -21,11 +21,14 @@ import api from "@/utils/api";
 import Toast from "react-native-toast-message";
 
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { AntDesign, MaterialCommunityIcons } from "@expo/vector-icons";
+import { FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons";
+
+
 import { LinearGradient } from "expo-linear-gradient";
 import { AxiosError } from "axios";
 import { getExpoPushToken } from "@/utils/pushToken";
 import { registerDeviceToken } from "@/utils/registerDeviceToken";
+import { Linking } from "react-native";
 
 // THAY THẾ MOTIVIEW và AnimatePresence BẰNG VIEW VÀ FRAGMENT
 const MotiView = View;
@@ -46,6 +49,21 @@ export default function LoginScreen() {
   const [numberPhone, setNumberPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const openFacebookApp = async () => {
+  const fbAppUrl = "fb://profile";
+  const fbWebUrl = "https://www.facebook.com";
+  const supported = await Linking.canOpenURL(fbAppUrl);
+  await Linking.openURL(supported ? fbAppUrl : fbWebUrl);
+};
+
+const openGoogleApp = async () => {
+  await Linking.openURL("https://accounts.google.com/");
+};
+
+const openAppleApp = async () => {
+  await Linking.openURL("https://appleid.apple.com/");
+};
+
 
   /* FORGOT PASSWORD (inline) */
   const [fpPhone, setFpPhone] = useState("");
@@ -429,101 +447,125 @@ export default function LoginScreen() {
           <View style={styles.formArea}>
             <AnimatePresence>
 
-              {/* ================= LOGIN FORM ================= */}
               {mode === "login" && (
-                <MotiView
-                  key="loginForm"
-                  style={styles.card}
-                >
-                  <Text style={styles.formTitle}>Đăng nhập</Text>
-                  <Text style={styles.formSubtitle}>Nhập thông tin để tiếp tục</Text>
+  <MotiView
+    key="loginForm"
+    style={styles.card}
+  >
+    <Text style={styles.formTitle}>Đăng nhập</Text>
+    <Text style={styles.formSubtitle}>Nhập thông tin để tiếp tục</Text>
 
-                  <View style={styles.inputWrapper}>
-                    <MaterialCommunityIcons name="phone-outline" size={22} color="#333" />
-                    <TextInput
-                      placeholder="Nhập số điện thoại"
-                      placeholderTextColor="#999"
-                      keyboardType="phone-pad"
-                      value={numberPhone}
-                      onChangeText={setNumberPhone}
-                      style={styles.input}
-                    />
-                  </View>
+    <View style={styles.inputWrapper}>
+      <MaterialCommunityIcons name="phone-outline" size={22} color="#333" />
+      <TextInput
+        placeholder="Nhập số điện thoại"
+        placeholderTextColor="#999"
+        keyboardType="phone-pad"
+        value={numberPhone}
+        onChangeText={setNumberPhone}
+        style={styles.input}
+      />
+    </View>
 
-                  <View style={styles.inputWrapper}>
-                    <MaterialCommunityIcons name="lock-outline" size={22} color="#333" />
-                    <TextInput
-                      placeholder="Mật khẩu"
-                      placeholderTextColor="#999"
-                      secureTextEntry
-                      value={password}
-                      onChangeText={setPassword}
-                      style={styles.input}
-                    />
-                  </View>
+    <View style={styles.inputWrapper}>
+      <MaterialCommunityIcons name="lock-outline" size={22} color="#333" />
+      <TextInput
+        placeholder="Mật khẩu"
+        placeholderTextColor="#999"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+        style={styles.input}
+      />
+    </View>
 
-                  <TouchableOpacity style={styles.forgotBtn} onPress={() => setMode("forgot")}>
-                    <Text style={styles.forgotText}>Quên mật khẩu?</Text>
-                  </TouchableOpacity>
+    <TouchableOpacity style={styles.forgotBtn} onPress={() => setMode("forgot")}>
+      <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+    </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.loginButton, loginLoading && { opacity: 0.7 }]}
-                    onPress={handleSignIn}
-                    disabled={loginLoading}
-                  >
-                    {loginLoading ? <ActivityIndicator color="#000" /> : <Text style={styles.loginButtonText}>Đăng nhập</Text>}
-                  </TouchableOpacity>
+    <TouchableOpacity
+      style={[styles.loginButton, loginLoading && { opacity: 0.7 }]}
+      onPress={handleSignIn}
+      disabled={loginLoading}
+    >
+      {loginLoading ? (
+        <ActivityIndicator color="#000" />
+      ) : (
+        <Text style={styles.loginButtonText}>Đăng nhập</Text>
+      )}
+    </TouchableOpacity>
 
-                  <Text style={styles.orText}>Hoặc tiếp tục với</Text>
-                 <View style={styles.socialRow}>
-  <View style={styles.socialBtn}><AntDesign name={"apple1" as any} size={24} color="#000" /></View>
-  <View style={styles.socialBtn}><AntDesign name="google" size={24} color="#DB4437" /></View>
-  <View style={styles.socialBtn}><AntDesign name={"facebook-square" as any} size={24} color="#4267B2" /></View>
+    <Text style={styles.orText}>Hoặc tiếp tục với</Text>
+
+    {/* ===== SOCIAL REAL LINKS (ĐÃ FIX) ===== */}
+   <View style={styles.socialRow}>
+  <TouchableOpacity style={styles.socialBtn} onPress={openAppleApp}>
+    <FontAwesome name="apple" size={26} color="#000" />
+  </TouchableOpacity>
+
+  <TouchableOpacity style={styles.socialBtn} onPress={openGoogleApp}>
+    <FontAwesome name="google" size={26} color="#DB4437" />
+  </TouchableOpacity>
+
+  <TouchableOpacity style={styles.socialBtn} onPress={openFacebookApp}>
+    <FontAwesome name="facebook-square" size={26} color="#4267B2" />
+  </TouchableOpacity>
 </View>
 
-                  <View style={styles.footerRow}>
-                    <Text style={styles.footerText}>Chưa có tài khoản?</Text>
-                    <TouchableOpacity onPress={() => setMode("register")}>
-                      <Text style={styles.registerText}>Đăng ký ngay</Text>
-                    </TouchableOpacity>
-                  </View>
-                </MotiView>
-              )}
 
-              {/* ================= FORGOT FORM ================= */}
-              {mode === "forgot" && (
-                <MotiView
-                  key="forgotForm"
-                  style={styles.card}
-                >
-                  <Text style={styles.formTitle}>Quên mật khẩu</Text>
-                  <Text style={styles.formSubtitle}>Nhập số điện thoại để nhận mã OTP</Text>
+    <View style={styles.footerRow}>
+      <Text style={styles.footerText}>Chưa có tài khoản?</Text>
+      <TouchableOpacity onPress={() => setMode("register")}>
+        <Text style={styles.registerText}>Đăng ký ngay</Text>
+      </TouchableOpacity>
+    </View>
+  </MotiView>
+)}
 
-                  <View style={styles.inputWrapper}>
-                    <MaterialCommunityIcons name="phone-outline" size={22} color="#333" />
-                    <TextInput
-                      placeholder="Nhập số điện thoại"
-                      placeholderTextColor="#999"
-                      keyboardType="phone-pad"
-                      value={fpPhone}
-                      onChangeText={setFpPhone}
-                      style={styles.input}
-                    />
-                  </View>
 
-                  <TouchableOpacity
-                    style={[styles.loginButton, fpLoading && { opacity: 0.7 }]}
-                    disabled={fpLoading}
-                    onPress={handleSendOtp}
-                  >
-                    {fpLoading ? <ActivityIndicator color="#000" /> : <Text style={styles.loginButtonText}>Gửi mã OTP</Text>}
-                  </TouchableOpacity>
+{/* ================= FORGOT FORM ================= */}
+{mode === "forgot" && (
+  <MotiView
+    key="forgotForm"
+    style={styles.card}
+  >
+    <Text style={styles.formTitle}>Quên mật khẩu</Text>
+    <Text style={styles.formSubtitle}>Nhập số điện thoại để nhận mã OTP</Text>
 
-                  <TouchableOpacity onPress={() => setMode("login")} style={{ alignSelf: "center", marginTop: 16 }}>
-                    <Text style={{ color: "#333", fontWeight: "600" }}>Quay lại đăng nhập</Text>
-                  </TouchableOpacity>
-                </MotiView>
-              )}
+    <View style={styles.inputWrapper}>
+      <MaterialCommunityIcons name="phone-outline" size={22} color="#333" />
+      <TextInput
+        placeholder="Nhập số điện thoại"
+        placeholderTextColor="#999"
+        keyboardType="phone-pad"
+        value={fpPhone}
+        onChangeText={setFpPhone}
+        style={styles.input}
+      />
+    </View>
+
+    <TouchableOpacity
+      style={[styles.loginButton, fpLoading && { opacity: 0.7 }]}
+      disabled={fpLoading}
+      onPress={handleSendOtp}
+    >
+      {fpLoading ? (
+        <ActivityIndicator color="#000" />
+      ) : (
+        <Text style={styles.loginButtonText}>Gửi mã OTP</Text>
+      )}
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      onPress={() => setMode("login")}
+      style={{ alignSelf: "center", marginTop: 16 }}
+    >
+      <Text style={{ color: "#333", fontWeight: "600" }}>
+        Quay lại đăng nhập
+      </Text>
+    </TouchableOpacity>
+  </MotiView>
+)}
 
               {/* ================= REGISTER FORM ================= */}
               {mode === "register" && (

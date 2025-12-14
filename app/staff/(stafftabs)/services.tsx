@@ -151,6 +151,15 @@ export default function StaffServices() {
     <View style={styles.container}>
       {/* HEADER */}
       <View style={styles.headerRow}>
+        {/* BACK (ADDED) */}
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => router.replace("/staff/(stafftabs)")}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.backText}>←</Text>
+        </TouchableOpacity>
+
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Quản lý dịch vụ</Text>
           <Text style={styles.headerSubtitle}>
@@ -202,6 +211,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 18,
     marginTop: 6,
+  },
+
+  // BACK (ADDED)
+  backBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginRight: 6,
+  },
+  backText: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#111",
   },
 
   headerTitle: {

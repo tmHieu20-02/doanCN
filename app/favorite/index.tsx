@@ -23,63 +23,92 @@ export default function FavoriteScreen() {
      LOAD FAVORITES
   ====================================== */
   const loadFavorites = async () => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const session = await SecureStore.getItemAsync("my-user-session");
-      const token = session ? JSON.parse(session).token : null;
+    const session = await SecureStore.getItemAsync("my-user-session");
+    const token = session ? JSON.parse(session).token : null;
 
-      const res = await fetch(
-        "https://phatdat.store/api/v1/favorite/get-all",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      const json = await res.json();
-
-      if (json.err === 0) {
-        setFavorites(json.data || []);
-      } else {
-        setFavorites([]);
+    const res = await fetch(
+      "https://phatdat.store/api/v1/favorite/get-all",
+      {
+        headers: { Authorization: `Bearer ${token}` },
       }
-    } catch (error) {
-      console.log("LOAD FAVORITE ERROR:", error);
-      setFavorites([]);
-    } finally {
-      setLoading(false);
+    );
+
+    const text = await res.text();
+
+    let json: any = null;
+
+    if (text) {
+      try {
+        json = JSON.parse(text);
+      } catch (e) {
+        console.log("PARSE FAVORITE ERROR:", e);
+      }
     }
-  };
 
-  useEffect(() => {
+    if (json && json.err === 0) {
+      setFavorites(json.data || []);
+    } else {
+      setFavorites([]);
+    }
+  } catch (error) {
+    console.log("LOAD FAVORITE ERROR:", error);
+    setFavorites([]);
+  } finally {
+    setLoading(false); // ✅ LUÔN ĐƯỢC GỌI
+  }
+  
+};
+useEffect(() => {
+  loadFavorites();
+}, []);
+
+useFocusEffect(
+  useCallback(() => {
     loadFavorites();
-  }, []);
+  }, [])
+);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadFavorites();
-    }, [])
-  );
 
   /* ======================================
      REMOVE FAVORITE
   ====================================== */
   const removeFavorite = async (service_id: number) => {
-    const session = await SecureStore.getItemAsync("my-user-session");
-    const token = session ? JSON.parse(session).token : null;
+  const session = await SecureStore.getItemAsync("my-user-session");
+  const token = session ? JSON.parse(session).token : null;
 
-    const res = await fetch(
-      `https://phatdat.store/api/v1/favorite/delete/${service_id}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+  const res = await fetch(
+    `https://phatdat.store/api/v1/favorite/delete/${service_id}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ service_id }),
+    }
+  );
 
-    return await res.json();
-  };
+  // 👉 DELETE thường không trả body
+  if (res.status === 204) {
+    return { err: 0 };
+  }
+
+  const text = await res.text(); // ✅ đọc raw text trước
+
+  if (!text) {
+    return { err: 0 };
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { err: 0 };
+  }
+};
+
 
   /* ======================================
      CARD

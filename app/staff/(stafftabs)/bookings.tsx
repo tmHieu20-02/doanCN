@@ -12,6 +12,7 @@ import {
 import axios from "axios";
 import { cancelAllBookings as cancelAllService } from "services/bookingService";
 import * as SecureStore from "expo-secure-store";
+import { useRouter } from "expo-router";
 
 type BookingStatus =
   | ""
@@ -22,6 +23,8 @@ type BookingStatus =
   | "cancelled";
 
 export default function StaffBooking() {
+  const router = useRouter();
+
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -113,11 +116,9 @@ export default function StaffBooking() {
           style: "destructive",
           onPress: async () => {
             try {
-              const res = await cancelAllService({
+              await cancelAllService({
                 cancel_note: "Shop nghỉ đột xuất",
               });
-
-              console.log("🔥 Hủy toàn bộ:", res.data);
               fetchBookings({ silent: true });
             } catch (error) {
               console.log("❌ Lỗi hủy hết:", error);
@@ -147,19 +148,17 @@ export default function StaffBooking() {
   };
 
   // ========================================================
-  // RENDER ONE BOOKING CARD (ĐÃ FIX)
+  // RENDER ONE BOOKING CARD
   // ========================================================
   const renderItem = ({ item }: any) => {
     const service = item.service || {};
     const serviceName = service.name || "Dịch vụ";
 
-    // ✔ FIX: LẤY booking_type → KHÔNG DÙNG service.service_type
     let serviceType = "Tại salon";
     if (item.booking_type === "at_home") serviceType = "Tại nhà";
 
     const customerName = item.customer?.full_name || "Ẩn danh";
 
-    // Giá
     const rawPrice =
       item.total_price ??
       item.totalPrice ??
@@ -168,43 +167,33 @@ export default function StaffBooking() {
       0;
 
     const price = Number(rawPrice).toLocaleString("vi-VN") + " đ";
-
     const badge = getStatusBadge(item.status);
 
     return (
       <View style={styles.card}>
-        {/* STATUS BADGE */}
         <View style={[styles.badge, { backgroundColor: badge.bg }]}>
           <Text style={styles.badgeText}>{badge.text}</Text>
         </View>
 
-        {/* SERVICE INFO */}
         <Text style={styles.serviceName}>{serviceName}</Text>
         <Text style={styles.serviceType}>Loại dịch vụ: {serviceType}</Text>
 
-        {/* ✔ HIỂN THỊ ĐỊA CHỈ NẾU TẠI NHÀ */}
         {item.booking_type === "at_home" && item.address_text ? (
           <Text style={styles.customer}>Địa chỉ: {item.address_text}</Text>
         ) : null}
 
-        {/* CUSTOMER */}
         <Text style={styles.customer}>Khách: {customerName}</Text>
-
-        {/* PRICE */}
         <Text style={styles.price}>Giá: {price}</Text>
 
-        {/* TIME */}
         <Text style={styles.time}>
           {item.start_time?.slice(0, 5)} – {item.end_time?.slice(0, 5)} •{" "}
           {item.booking_date?.slice(0, 10)}
         </Text>
 
-        {/* NOTE */}
         <Text style={styles.note}>
           Ghi chú: {item.note?.trim() || "Không có"}
         </Text>
 
-        {/* ACTION BUTTONS */}
         <View style={styles.actionRow}>
           {item.status === "pending" && (
             <TouchableOpacity
@@ -247,7 +236,7 @@ export default function StaffBooking() {
   };
 
   // ========================================================
-  // LOADING SCREEN
+  // LOADING
   // ========================================================
   if (loading && !refreshing) {
     return (
@@ -261,13 +250,22 @@ export default function StaffBooking() {
   }
 
   // ========================================================
-  // MAIN SCREEN
+  // MAIN
   // ========================================================
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Lịch hẹn của bạn</Text>
+      {/* HEADER + BACK */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.replace("/staff/(stafftabs)")}
+          style={styles.backBtn}
+        >
+          <Text style={styles.backText}>←</Text>
+        </TouchableOpacity>
 
-      {/* CANCEL ALL */}
+        <Text style={styles.title}>Lịch hẹn của bạn</Text>
+      </View>
+
       <TouchableOpacity
         style={styles.cancelAllBtn}
         onPress={handleCancelAllBookings}
@@ -277,7 +275,6 @@ export default function StaffBooking() {
 
       <Text style={styles.sub}>Xem và quản lý lịch hẹn được giao cho bạn</Text>
 
-      {/* FILTER ROW */}
       <View style={styles.filterRow}>
         {renderFilterButton("Tất cả", "")}
         {renderFilterButton("Chờ", "pending")}
@@ -286,7 +283,6 @@ export default function StaffBooking() {
         {renderFilterButton("Đã hủy", "cancelled")}
       </View>
 
-      {/* LIST */}
       <FlatList
         data={bookings}
         keyExtractor={(item) => String(item.id)}
@@ -306,12 +302,30 @@ export default function StaffBooking() {
 }
 
 // ========================================================
-// STYLES – PREMIUM UI
+// STYLES
 // ========================================================
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC", padding: 16 },
 
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+
+  backBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginRight: 6,
+  },
+
+  backText: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#2563EB",
+  },
 
   title: { fontSize: 22, fontWeight: "800", color: "#111827" },
 
@@ -323,7 +337,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 18,
     borderRadius: 8,
-    marginBottom: 14,
+    marginBottom: 10,
   },
   cancelAllText: { color: "#fff", fontWeight: "700", fontSize: 13 },
 
@@ -353,9 +367,6 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 16,
     marginBottom: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
@@ -386,7 +397,12 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 
-  actionRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 14, gap: 10 },
+  actionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 14,
+    gap: 10,
+  },
 
   actionBtn: { paddingVertical: 8, paddingHorizontal: 18, borderRadius: 8 },
   confirmBtn: { backgroundColor: "#2563EB" },

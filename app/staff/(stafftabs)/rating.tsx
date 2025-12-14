@@ -6,13 +6,17 @@ import {
   ScrollView,
   ActivityIndicator,
   Image,
+  TouchableOpacity,
 } from "react-native";
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
+import { useRouter } from "expo-router";
 
 import { colors, shadow, radius, spacing } from "../../../ui/theme";
 
 export default function StaffRatings() {
+  const router = useRouter();
+
   const [ratings, setRatings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -60,6 +64,19 @@ export default function StaffRatings() {
 
   return (
     <ScrollView style={styles.container}>
+      {/* BACK (ADDED) */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity
+          onPress={() => router.replace("/staff/(stafftabs)")}
+          style={styles.backBtn}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.backText}>←</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.screenTitle}>Đánh giá</Text>
+      </View>
+
       {/* Tổng quan */}
       <View style={styles.summaryCard}>
         <Text style={styles.avgRating}>{avgRating}</Text>
@@ -84,12 +101,11 @@ export default function StaffRatings() {
             {/* Header */}
             <View style={styles.headerRow}>
               {item.customer?.avatar ? (
-  <Image
-    source={{ uri: item.customer.avatar }}
-    style={styles.avatar}
-  />
-) : null}
-
+                <Image
+                  source={{ uri: item.customer.avatar }}
+                  style={styles.avatar}
+                />
+              ) : null}
 
               <View style={{ flex: 1 }}>
                 <Text style={styles.customerName}>
@@ -134,6 +150,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: colors.bg,
+  },
+
+  // BACK (ADDED)
+  topHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: spacing(4),
+  },
+  backBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginRight: 6,
+  },
+  backText: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  screenTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: colors.text,
   },
 
   summaryCard: {

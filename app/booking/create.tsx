@@ -129,32 +129,56 @@ export default function CreateBooking() {
     return list;
   };
 
+  
   const loadBookedSlots = async (selectedDate: Date) => {
-    try {
-      const stored = await SecureStore.getItemAsync("my-user-session");
-      const token = JSON.parse(stored!).token;
-      const res = await axios.get("https://phatdat.store/api/v1/booking/get-all", {
+  try {
+    const stored = await SecureStore.getItemAsync("my-user-session");
+    const token = JSON.parse(stored!).token;
+
+    const res = await axios.get(
+      "https://phatdat.store/api/v1/booking/get-all",
+      {
         headers: { Authorization: `Bearer ${token}` },
-      });
-      const all = res.data?.bookings || [];
-      const selectedDateStr = formatYMD(selectedDate);
-      const filtered = all.filter((b: any) => {
-        const bookingDate = (b.booking_date || "").slice(0, 10);
-        return bookingDate === selectedDateStr;
-      });
-      const booked: string[] = [];
-      filtered.forEach((b: any) => {
-        if (!b.start_time) return;
-        const [rawHour] = String(b.start_time).split(":");
-        const hour = String(rawHour).padStart(2, "0");
-        const slotKey = `${hour}:00`;
-        if (!booked.includes(slotKey)) booked.push(slotKey);
-      });
-      setBookedSlots(booked);
-    } catch (err) {
-      console.log("LOAD SLOTS ERROR:", err);
-    }
-  };
+      }
+    );
+
+    const all = res.data?.bookings || [];
+    const selectedDateStr = formatYMD(selectedDate);
+
+    // 🔥 FIX: BỎ QUA BOOKING ĐÃ HỦY
+    const filtered = all.filter((b: any) => {
+      const bookingDate = (b.booking_date || "").slice(0, 10);
+
+      if (bookingDate !== selectedDateStr) return false;
+
+      // ❌ KHÔNG TÍNH SLOT CỦA BOOKING ĐÃ HỦY
+      if (
+        b.status === "cancelled" ||
+        b.status === "canceled" ||
+        b.status === "rejected"
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const booked: string[] = [];
+
+    filtered.forEach((b: any) => {
+      if (!b.start_time) return;
+      const [rawHour] = String(b.start_time).split(":");
+      const hour = String(rawHour).padStart(2, "0");
+      const slotKey = `${hour}:00`;
+      if (!booked.includes(slotKey)) booked.push(slotKey);
+    });
+
+    setBookedSlots(booked);
+  } catch (err) {
+    console.log("LOAD SLOTS ERROR:", err);
+  }
+};
+
 
   useEffect(() => {
     if (serviceId) {

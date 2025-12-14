@@ -12,7 +12,7 @@ import { Bell, Calendar, CheckCircle, X } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
-
+import { Swipeable } from "react-native-gesture-handler";
 import { colors, radius, shadow, spacing } from "@/ui/theme";
 
 /* ==============================
@@ -31,61 +31,46 @@ type NotificationItem = {
 };
 
 /* ==============================
-   API HELPERS (MATCH BE)
+   API HELPERS
 ================================ */
 const getToken = async () => {
   const session = await SecureStore.getItemAsync("my-user-session");
   const token = session ? JSON.parse(session).token : null;
-  console.log("🔔 [NOTI] TOKEN:", token);
   return token;
 };
 
 const fetchNotifications = async (): Promise<any[]> => {
   const token = await getToken();
 
-  console.log("🔔 [NOTI] FETCH START");
-
-  const res = await fetch("https://phatdat.store/api/v1/notification/get", {
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-});
-
-
-  console.log("🔔 [NOTI] STATUS:", res.status);
+  const res = await fetch(
+    "https://phatdat.store/api/v1/notification/get",
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
 
   const json = await res.json();
-  console.log("🔔 [NOTI] RESPONSE JSON:", json);
-
   return json.notifications || [];
 };
 
 const apiMarkRead = async (id: number) => {
   const token = await getToken();
-  console.log("🔔 [NOTI] MARK READ:", id);
-
   await fetch(
     `https://phatdat.store/api/v1/notification/read/${id}`,
     {
       method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     }
   );
 };
 
 const apiDelete = async (id: number) => {
   const token = await getToken();
-  console.log("🔔 [NOTI] DELETE:", id);
-
   await fetch(
     `https://phatdat.store/api/v1/notification/${id}`,
     {
       method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     }
   );
 };
@@ -129,38 +114,15 @@ const getColorByType = (type?: string): string => {
 };
 
 /* ==============================
-   EMPTY STATE
-================================ */
-const EmptyState = ({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-}) => (
-  <View style={styles.emptyWrapper}>
-    {icon}
-    <Text style={styles.emptyTitle}>{title}</Text>
-    <Text style={styles.emptySubtitle}>{subtitle}</Text>
-  </View>
-);
-
-/* ==============================
-   MAP API → UI (FIXED)
+   MAP API → UI
 ================================ */
 const mapNotificationFromApi = (n: any): NotificationItem => {
-  console.log("🔔 [NOTI] MAP RAW ITEM:", n);
-
   let bookingId: string | undefined;
 
   if (n.booking_id) bookingId = String(n.booking_id);
-
   if (!bookingId && n.data) {
-    if (typeof n.data === "object") {
-      bookingId = n.data.bookingId;
-    } else if (typeof n.data === "string") {
+    if (typeof n.data === "object") bookingId = n.data.bookingId;
+    else if (typeof n.data === "string") {
       try {
         bookingId = JSON.parse(n.data)?.bookingId;
       } catch {}
@@ -171,9 +133,9 @@ const mapNotificationFromApi = (n: any): NotificationItem => {
     id: n.id,
     type: n.type,
     title: n.title,
-    message: n.body,              // ✅ FIX: BE dùng body
+    message: n.body,
     time: formatTime(n.createdAt),
-    read: Boolean(n.is_read),     // ✅ FIX: BE dùng is_read
+    read: Boolean(n.is_read),
     icon: getIconName(n.type),
     color: getColorByType(n.type),
     bookingId,
@@ -181,7 +143,7 @@ const mapNotificationFromApi = (n: any): NotificationItem => {
 };
 
 /* ==============================
-   MAIN SCREEN
+   MAIN
 ================================ */
 export default function NotificationsScreen() {
   const [list, setList] = useState<NotificationItem[]>([]);
@@ -193,23 +155,17 @@ export default function NotificationsScreen() {
   const loadData = async () => {
     try {
       const raw = await fetchNotifications();
-      console.log("🔔 [NOTI] RAW LIST:", raw);
-
       if (Array.isArray(raw)) {
-        const mapped = raw.map(mapNotificationFromApi);
-        console.log("🔔 [NOTI] MAPPED LIST:", mapped);
-        setList(mapped);
+        setList(raw.map(mapNotificationFromApi));
       }
-    } catch (error) {
-      console.log("❌ [NOTI] LOAD ERROR:", error);
+    } catch (e) {
+      console.log("LOAD NOTI ERROR:", e);
     }
   };
 
   const unreadCount = list.filter((n) => !n.read).length;
 
   const openDetail = async (item: NotificationItem) => {
-    console.log("🔔 [NOTI] OPEN:", item);
-
     if (!item.read) {
       setList((prev) =>
         prev.map((n) =>
@@ -219,12 +175,12 @@ export default function NotificationsScreen() {
       await apiMarkRead(item.id);
     }
 
-    if (!item.bookingId) return;
-
-    router.push({
-      pathname: "/booking/[id]",
-      params: { id: item.bookingId },
-    } as any);
+    if (item.bookingId) {
+      router.push({
+        pathname: "/booking/[id]",
+        params: { id: item.bookingId },
+      } as any);
+    }
   };
 
   const handleDelete = (id: number, title: string) => {
@@ -249,45 +205,62 @@ export default function NotificationsScreen() {
     );
   };
 
-  const renderItem = ({ item }: { item: NotificationItem }) => (
+  /* ===== SWIPE DELETE VIEW ===== */
+  const renderRightActions = (item: NotificationItem) => (
     <TouchableOpacity
-      style={[styles.card, !item.read && styles.cardUnread]}
-      onPress={() => openDetail(item)}
+      style={styles.swipeDelete}
+      onPress={() => handleDelete(item.id, item.title)}
     >
-      <View style={styles.row}>
-        <View
-          style={[
-            styles.iconWrapper,
-            { backgroundColor: item.color + "22" },
-          ]}
-        >
-          {item.icon === "calendar" ? (
-            <Calendar size={20} color={item.color} />
-          ) : item.icon === "check" ? (
-            <CheckCircle size={20} color={item.color} />
-          ) : (
-            <Bell size={20} color={item.color} />
-          )}
-        </View>
-
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.cardTitle, !item.read && styles.bold]}>
-            {item.title}
-          </Text>
-          <Text style={styles.cardMessage}>{item.message}</Text>
-          <Text style={styles.cardTime}>{item.time}</Text>
-        </View>
-
-        <TouchableOpacity
-          onPress={() => handleDelete(item.id, item.title)}
-          style={{ padding: 4 }}
-        >
-          <X size={16} color={colors.textMuted} />
-        </TouchableOpacity>
-      </View>
-
-      {!item.read && <View style={styles.unreadDot} />}
+      <X size={20} color="#fff" />
+      <Text style={styles.swipeDeleteText}>Xóa</Text>
     </TouchableOpacity>
+  );
+
+  const renderItem = ({ item }: { item: NotificationItem }) => (
+    <Swipeable
+      renderRightActions={() => renderRightActions(item)}
+      overshootRight={false}
+    >
+      <TouchableOpacity
+        style={[styles.card, !item.read && styles.cardUnread]}
+        onPress={() => openDetail(item)}
+        activeOpacity={0.85}
+      >
+        <View style={styles.row}>
+          <View
+            style={[
+              styles.iconWrapper,
+              { backgroundColor: item.color + "22" },
+            ]}
+          >
+            {item.icon === "calendar" ? (
+              <Calendar size={20} color={item.color} />
+            ) : item.icon === "check" ? (
+              <CheckCircle size={20} color={item.color} />
+            ) : (
+              <Bell size={20} color={item.color} />
+            )}
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.cardTitle, !item.read && styles.bold]}>
+              {item.title}
+            </Text>
+            <Text style={styles.cardMessage}>{item.message}</Text>
+            <Text style={styles.cardTime}>{item.time}</Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => handleDelete(item.id, item.title)}
+            style={{ padding: 4 }}
+          >
+            <X size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        {!item.read && <View style={styles.unreadDot} />}
+      </TouchableOpacity>
+    </Swipeable>
   );
 
   return (
@@ -312,11 +285,13 @@ export default function NotificationsScreen() {
           contentContainerStyle={{ padding: 20 }}
         />
       ) : (
-        <EmptyState
-          icon={<Bell size={64} color={colors.border} />}
-          title="Không có thông báo"
-          subtitle="Thông báo mới sẽ xuất hiện tại đây"
-        />
+        <View style={styles.emptyWrapper}>
+          <Bell size={64} color={colors.border} />
+          <Text style={styles.emptyTitle}>Không có thông báo</Text>
+          <Text style={styles.emptySubtitle}>
+            Thông báo mới sẽ xuất hiện tại đây
+          </Text>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -334,6 +309,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 26, fontWeight: "800", color: colors.text },
   headerSubtitle: { marginTop: 4, color: colors.textMuted },
+
   card: {
     backgroundColor: colors.card,
     padding: spacing(4),
@@ -341,7 +317,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing(3),
     ...shadow.card,
   },
-  cardUnread: { borderLeftWidth: 4, borderLeftColor: colors.primaryDark },
+  cardUnread: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primaryDark,
+  },
+
   row: { flexDirection: "row" },
   iconWrapper: {
     width: 44,
@@ -355,6 +335,7 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "800" },
   cardMessage: { color: colors.textMuted },
   cardTime: { fontSize: 12, color: colors.textMuted },
+
   unreadDot: {
     width: 8,
     height: 8,
@@ -364,7 +345,23 @@ const styles = StyleSheet.create({
     top: 10,
     right: 10,
   },
+
   emptyWrapper: { alignItems: "center", marginTop: 100 },
   emptyTitle: { fontSize: 20, fontWeight: "700" },
   emptySubtitle: { color: colors.textMuted },
+
+  swipeDelete: {
+    width: 80,
+    backgroundColor: "#EF4444",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: radius.lg,
+    marginBottom: spacing(3),
+  },
+  swipeDeleteText: {
+    color: "#fff",
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: "600",
+  },
 });

@@ -102,103 +102,124 @@ export default function HomeScreen() {
     }, [])
   );
 
-  /* ============================================
-     LOAD FAVORITES
-  ============================================ */
-  const loadFavorites = async () => {
-    try {
-      const session = await SecureStore.getItemAsync("my-user-session");
-      const token = session ? JSON.parse(session).token : null;
 
-      const res = await fetch(
-        "https://phatdat.store/api/v1/favorite/get-all",
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+ /* ============================================
+   LOAD FAVORITES (LOAD 1 LẦN)
+============================================ */
+const loadFavorites = async () => {
+  try {
+    const session = await SecureStore.getItemAsync("my-user-session");
+    const token = session ? JSON.parse(session).token : null;
 
-      const json = await res.json();
+    const res = await fetch(
+      "https://phatdat.store/api/v1/favorite/get-all",
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-      if (json.err === 0) {
-        setFavoriteServices(json.data.map((f: any) => f.service_id));
-      }
-    } catch (err) {
-      console.log("LOAD FAVORITES ERROR:", err);
+    const text = await res.text();
+
+    if (!text) {
+      setFavoriteServices([]);
+      return;
     }
-  };
 
-  useEffect(() => {
-    loadFavorites();
-  }, []);
+    const json = JSON.parse(text);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadFavorites();
-    }, [])
-  );
+    if (json.err === 0) {
+      setFavoriteServices(json.data.map((f: any) => f.service_id));
+    }
+  } catch (err) {
+    console.log("LOAD FAVORITES ERROR:", err);
+  }
+};
+
+useEffect(() => {
+  loadFavorites();
+}, []);
+
+
 
   /* ============================================
      FAVORITE API
   ============================================ */
-  const addFavorite = async (service_id: number) => {
-    const session = await SecureStore.getItemAsync("my-user-session");
-    const token = session ? JSON.parse(session).token : null;
+const addFavorite = async (service_id: number) => {
+  const session = await SecureStore.getItemAsync("my-user-session");
+  const token = session ? JSON.parse(session).token : null;
 
-    const res = await fetch(
-      "https://phatdat.store/api/v1/favorite/create",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ service_id }),
-      }
-    );
+  const res = await fetch(
+    "https://phatdat.store/api/v1/favorite/create",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ service_id }),
+    }
+  );
 
-    return await res.json();
-  };
+  if (res.status === 204) return { err: 0 };
+
+  const text = await res.text();
+  if (!text) return { err: 0 };
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { err: 0 };
+  }
+};
+
 
   // 🔥 FIX DUY NHẤT – DELETE PHẢI GỬI BODY
-  const removeFavorite = async (service_id: number) => {
-    const session = await SecureStore.getItemAsync("my-user-session");
-    const token = session ? JSON.parse(session).token : null;
+ const removeFavorite = async (service_id: number) => {
+  const session = await SecureStore.getItemAsync("my-user-session");
+  const token = session ? JSON.parse(session).token : null;
 
-    const res = await fetch(
-      "https://phatdat.store/api/v1/favorite/delete",
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ service_id }),
-      }
-    );
+  const res = await fetch(
+    `https://phatdat.store/api/v1/favorite/delete/${service_id}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
-    return await res.json();
-  };
+  if (res.status === 204) return { err: 0 };
+
+  const text = await res.text();
+  if (!text) return { err: 0 };
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { err: 0 };
+  }
+};
 
   /* ============================================
      TOGGLE FAVORITE (GIỮ NGUYÊN LOGIC)
   ============================================ */
-  const toggleFavorite = async (id: number) => {
-    const isFav = favoriteServices.includes(id);
+ const toggleFavorite = async (id: number) => {
+  const isFav = favoriteServices.includes(id);
 
-    // Optimistic UI
+  // Optimistic UI
+  setFavoriteServices((prev) =>
+    isFav ? prev.filter((x) => x !== id) : [...prev, id]
+  );
+
+  const res = isFav
+    ? await removeFavorite(id)
+    : await addFavorite(id);
+
+  // Rollback nếu BE fail
+  if (res.err !== 0) {
     setFavoriteServices((prev) =>
-      isFav ? prev.filter((x) => x !== id) : [...prev, id]
+      isFav ? [...prev, id] : prev.filter((x) => x !== id)
     );
-
-    let res;
-    if (isFav) res = await removeFavorite(id);
-    else res = await addFavorite(id);
-
-    // Rollback nếu BE fail
-    if (res.err !== 0) {
-      setFavoriteServices((prev) =>
-        isFav ? [...prev, id] : prev.filter((x) => x !== id)
-      );
-    }
-  };
+  }
+};
 
   /* ============================================
      SEARCH
