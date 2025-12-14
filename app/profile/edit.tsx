@@ -8,6 +8,7 @@ import {
   ScrollView,
   SafeAreaView,
   Image,
+  Alert,
 } from "react-native";
 
 import { useRouter } from "expo-router";
@@ -26,12 +27,13 @@ export default function EditProfileScreen() {
   const [gender, setGender] = useState("");
   const [phone, setPhone] = useState("");
 
-  
-  const [avatar, setAvatar] = useState("https://i.ibb.co/Mff2W3V/default-avatar.png");
+  const [avatar, setAvatar] = useState(
+    "https://i.ibb.co/Mff2W3V/default-avatar.png"
+  );
 
   /* ============================================
-        LOAD USER + SYNC AVATAR TỪ SECURESTORE
-  ============================================= */
+        LOAD USER + AVATAR (READ ONLY)
+  ============================================ */
   useEffect(() => {
     if (user) {
       setFullName(user.full_name || "");
@@ -51,35 +53,49 @@ export default function EditProfileScreen() {
   }, [user]);
 
   /* ============================
-          HANDLE SAVE
+          HANDLE SAVE (FIXED)
   ============================ */
   const handleSave = async () => {
-    const payload = {
-      full_name: fullName,
-      gender: gender,
-    };
+    try {
+      const payload = {
+        full_name: fullName,
+        gender: gender,
+      };
 
-    const res = await updateUser(payload);
-    console.log("UPDATE RESULT:", res);
+      const res = await updateUser(payload);
+      console.log("UPDATE RESULT:", res);
 
-    if (res?.err === 1) {
-      alert("Lỗi cập nhật: " + res.mes);
-      return;
+      if (res?.err === 1) {
+        Alert.alert("Lỗi", res.mes || "Cập nhật thất bại");
+        return;
+      }
+
+      /**
+       * 🔥 FIX QUAN TRỌNG:
+       * KHÔNG ghi đè session
+       * PHẢI merge để giữ token / role / id
+       */
+      const stored = await SecureStore.getItemAsync("my-user-session");
+      if (stored) {
+        const oldSession = JSON.parse(stored);
+
+        const newSession = {
+          ...oldSession,          // ✅ GIỮ TOKEN + ROLE + USER_ID
+          full_name: fullName,
+          gender: gender,
+        };
+
+        await SecureStore.setItemAsync(
+          "my-user-session",
+          JSON.stringify(newSession)
+        );
+      }
+
+      Alert.alert("Thành công", "Cập nhật hồ sơ thành công!");
+      router.back();
+    } catch (e) {
+      Alert.alert("Lỗi", "Không thể cập nhật hồ sơ");
     }
-
-    // ⭐ Lưu session local
-    const stored = await SecureStore.getItemAsync("my-user-session");
-    if (stored) {
-      const session = JSON.parse(stored);
-      session.full_name = fullName;
-      session.gender = gender;
-      if (session.avatar) setAvatar(session.avatar);
-
-      await SecureStore.setItemAsync("my-user-session", JSON.stringify(session));
-    }
-
-    alert("Cập nhật thành công!");
-    router.back();
   };
 
   return (
@@ -103,12 +119,9 @@ export default function EditProfileScreen() {
           />
         </View>
 
-        {/* AVATAR FLOATING */}
+        {/* AVATAR */}
         <View style={styles.avatarWrapper}>
-          <Image
-            source={{ uri: avatar }}
-            style={styles.avatar}
-          />
+          <Image source={{ uri: avatar }} style={styles.avatar} />
         </View>
 
         {/* FORM */}
@@ -134,49 +147,63 @@ export default function EditProfileScreen() {
               value={phone}
               editable={false}
               style={[styles.input, { opacity: 0.6 }]}
-              placeholder="Số điện thoại (không chỉnh sửa)"
+              placeholder="Số điện thoại"
             />
           </View>
 
           {/* GENDER */}
           <View style={[styles.inputGroup, { flexDirection: "column" }]}>
             <View style={{ flexDirection: "row", marginBottom: 6 }}>
-              <UserCircle2 size={20} color={colors.primaryDark} style={{ marginRight: 10 }} />
-              <Text style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>
+              <UserCircle2
+                size={20}
+                color={colors.primaryDark}
+                style={{ marginRight: 10 }}
+              />
+              <Text
+                style={{ fontSize: 15, fontWeight: "600", color: colors.text }}
+              >
                 Giới tính
               </Text>
             </View>
 
             <View style={{ flexDirection: "row", gap: 14 }}>
-              {/* Male */}
               <TouchableOpacity
                 onPress={() => setGender("male")}
                 style={[
                   styles.genderOption,
-                  gender === "male" && styles.genderOptionActive
+                  gender === "male" && styles.genderOptionActive,
                 ]}
               >
-                <Text style={{ color: gender === "male" ? "#000" : colors.textMuted }}>
+                <Text
+                  style={{
+                    color:
+                      gender === "male" ? "#000" : colors.textMuted,
+                  }}
+                >
                   Nam
                 </Text>
               </TouchableOpacity>
 
-              {/* Female */}
               <TouchableOpacity
                 onPress={() => setGender("female")}
                 style={[
                   styles.genderOption,
-                  gender === "female" && styles.genderOptionActive
+                  gender === "female" && styles.genderOptionActive,
                 ]}
               >
-                <Text style={{ color: gender === "female" ? "#000" : colors.textMuted }}>
+                <Text
+                  style={{
+                    color:
+                      gender === "female" ? "#000" : colors.textMuted,
+                  }}
+                >
                   Nữ
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* SAVE BUTTON */}
+          {/* SAVE */}
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
             <Save size={22} color="#fff" />
             <Text style={styles.saveBtnText}>Lưu thay đổi</Text>
@@ -202,7 +229,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing(10),
     borderBottomLeftRadius: 26,
     borderBottomRightRadius: 26,
-    position: "relative",
   },
   bannerTitle: {
     fontSize: 22,
@@ -282,8 +308,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginLeft: spacing(2),
   },
-
-  /* Gender Select */
   genderOption: {
     paddingVertical: 8,
     paddingHorizontal: 18,

@@ -9,12 +9,14 @@ import {
   Switch,
 } from "react-native";
 import { useState, useEffect } from "react";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import api from "@/utils/api";
 import * as SecureStore from "expo-secure-store";
 import { useAuth } from "@/hooks/useAuth";
-import { Lock } from "lucide-react-native";
+import { Lock, ArrowLeft } from "lucide-react-native";
+
+const DRAFT_KEY = "staff-edit-profile-draft";
 
 export default function EditStaffProfile() {
   const router = useRouter();
@@ -29,15 +31,27 @@ export default function EditStaffProfile() {
   const [experience, setExperience] = useState("");
   const [bio, setBio] = useState("");
   const [isActive, setIsActive] = useState(true);
-
   const [storeLat, setStoreLat] = useState("");
   const [storeLng, setStoreLng] = useState("");
 
   /* =========================
-     LOAD PROFILE
+     LOAD PROFILE / DRAFT
+     (Draft KHÔNG set lat/lng)
   ========================= */
   useEffect(() => {
     const load = async () => {
+      const draft = await SecureStore.getItemAsync(DRAFT_KEY);
+
+      if (draft) {
+        const d = JSON.parse(draft);
+        setStoreName(d.storeName || "");
+        setStoreAddress(d.storeAddress || "");
+        setExperience(d.experience || "");
+        setBio(d.bio || "");
+        setIsActive(d.isActive ?? true);
+        return;
+      }
+
       const stored = await SecureStore.getItemAsync("my-user-session");
       const data = stored ? JSON.parse(stored) : {};
       const profile = data?.staffProfile;
@@ -58,17 +72,52 @@ export default function EditStaffProfile() {
 
   /* =========================
      UPDATE FROM MAP PICKER
+     (Map là source of truth)
   ========================= */
   useEffect(() => {
     if (params.selectedLat && params.selectedLng) {
-      setStoreLat(String(params.selectedLat));
-      setStoreLng(String(params.selectedLng));
-      Alert.alert("Thành công", "Đã cập nhật vị trí từ bản đồ.");
+      const lat = String(params.selectedLat);
+      const lng = String(params.selectedLng);
+
+      setStoreLat(lat);
+      setStoreLng(lng);
+
+      // 🔥 Update lại draft với vị trí MỚI
+      SecureStore.setItemAsync(
+        DRAFT_KEY,
+        JSON.stringify({
+          storeName,
+          storeAddress,
+          experience,
+          bio,
+          isActive,
+          storeLat: lat,
+          storeLng: lng,
+        })
+      );
     }
   }, [params.selectedLat, params.selectedLng]);
 
   /* =========================
-     SAVE PROFILE
+     SAVE DRAFT (TRƯỚC KHI MỞ MAP)
+  ========================= */
+  const saveDraft = async () => {
+    await SecureStore.setItemAsync(
+      DRAFT_KEY,
+      JSON.stringify({
+        storeName,
+        storeAddress,
+        experience,
+        bio,
+        isActive,
+        storeLat,
+        storeLng,
+      })
+    );
+  };
+
+  /* =========================
+     SAVE PROFILE (FINAL)
   ========================= */
   const handleSave = async () => {
     if (!storeName.trim()) {
@@ -78,39 +127,35 @@ export default function EditStaffProfile() {
       );
     }
 
-    if (storeLat && isNaN(Number(storeLat)))
-      return Alert.alert("Lỗi", "Lat không hợp lệ.");
-    if (storeLng && isNaN(Number(storeLng)))
-      return Alert.alert("Lỗi", "Lng không hợp lệ.");
-
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
       const token = JSON.parse(stored || "{}")?.token;
 
-      const body = {
-        store_name: storeName,
-        store_address: storeAddress,
-        experience_years: Number(experience) || 0,
-        bio,
-        is_active: isActive,
-        store_lat: storeLat ? Number(storeLat) : null,
-        store_lng: storeLng ? Number(storeLng) : null,
-      };
-
-      const res = await api.put("/staff/profile", body, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.put(
+        "/staff/profile",
+        {
+          store_name: storeName,
+          store_address: storeAddress,
+          experience_years: Number(experience) || 0,
+          bio,
+          is_active: isActive,
+          store_lat: storeLat ? Number(storeLat) : null,
+          store_lng: storeLng ? Number(storeLng) : null,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
       if (res.data?.err === 0) {
+        await SecureStore.deleteItemAsync(DRAFT_KEY);
+
         const saved = stored ? JSON.parse(stored) : {};
         saved.staffProfile = res.data.profile;
-
         await SecureStore.setItemAsync(
           "my-user-session",
           JSON.stringify(saved)
         );
-        await updateUser({ staffProfile: res.data.profile });
 
+        await updateUser({ staffProfile: res.data.profile });
         Alert.alert("Thành công", "Đã cập nhật thông tin làm việc.");
         router.back();
       } else {
@@ -125,174 +170,171 @@ export default function EditStaffProfile() {
      UI
   ========================= */
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: "#F8FAFC" }}
-      edges={["top", "left", "right"]}
-    >
-      <ScrollView style={styles.contentContainer}>
-        <Text style={styles.header}>Thông tin làm việc</Text>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
 
-        <Text style={styles.label}>Tên địa điểm / cửa hàng</Text>
-        <TextInput
-          style={styles.input}
-          value={storeName}
-          onChangeText={setStoreName}
-          placeholder="VD: Barber Phát Đạt, Spa Minh Anh..."
-        />
-
-        <Text style={styles.label}>Địa chỉ làm việc</Text>
-        <TextInput
-          style={styles.input}
-          value={storeAddress}
-          onChangeText={setStoreAddress}
-          placeholder="Nhập địa chỉ nơi cung cấp dịch vụ"
-        />
-
-        <Text style={styles.label}>Kinh nghiệm (năm)</Text>
-        <TextInput
-          style={styles.input}
-          value={experience}
-          onChangeText={setExperience}
-          keyboardType="numeric"
-          placeholder="VD: 3"
-        />
-
-        <Text style={styles.label}>Giới thiệu ngắn</Text>
-        <TextInput
-          style={[styles.input, { height: 100 }]}
-          value={bio}
-          onChangeText={setBio}
-          multiline
-          placeholder="Mô tả kinh nghiệm, kỹ năng, phong cách làm việc..."
-        />
-
-        <Text style={styles.label}>Vị trí làm việc</Text>
-        <View style={styles.locationRow}>
-          <View style={styles.lockedInputWrapper}>
-            <TextInput
-              style={styles.locationInput}
-              placeholder="Lat"
-              value={storeLat}
-              editable={false}
-            />
-            <Lock size={16} color="#6B7280" style={styles.lockIcon} />
-          </View>
-
-          <View style={{ width: 10 }} />
-
-          <View style={styles.lockedInputWrapper}>
-            <TextInput
-              style={styles.locationInput}
-              placeholder="Lng"
-              value={storeLng}
-              editable={false}
-            />
-            <Lock size={16} color="#6B7280" style={styles.lockIcon} />
-          </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F9FAFB" }}>
+        {/* Header custom */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <ArrowLeft size={22} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Thông tin làm việc</Text>
+          <View style={{ width: 22 }} />
         </View>
 
-        {/* ✅ FIX: PUSH MODAL — KHÔNG ĐỔI TAB, KHÔNG RESET */}
-        <TouchableOpacity
-          style={styles.mapBtn}
-          onPress={() =>
-            router.push({
-              pathname: "/staff/modal/map-picker",
-              params: {
-                lat: storeLat || "10.762622",
-                lng: storeLng || "106.660172",
-              },
-            })
-          }
-        >
-          <Text style={styles.mapText}>Chọn vị trí trên bản đồ</Text>
-        </TouchableOpacity>
+        <ScrollView contentContainerStyle={styles.container}>
+          <Label text="Tên cửa hàng" />
+          <Input value={storeName} onChangeText={setStoreName} />
 
-        <View style={styles.switchRow}>
-          <Text style={styles.label}>Đang nhận khách</Text>
-          <Switch
-            value={isActive}
-            onValueChange={setIsActive}
-            trackColor={{ false: "#767577", true: "#2563EB" }}
-            thumbColor={isActive ? "#fff" : "#f4f3f4"}
+          <Label text="Địa chỉ" />
+          <Input value={storeAddress} onChangeText={setStoreAddress} />
+
+          <Label text="Kinh nghiệm (năm)" />
+          <Input
+            value={experience}
+            onChangeText={setExperience}
+            keyboardType="numeric"
           />
-        </View>
 
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveText}>Lưu thông tin</Text>
-        </TouchableOpacity>
+          <Label text="Giới thiệu" />
+          <Input
+            value={bio}
+            onChangeText={setBio}
+            multiline
+            style={{ height: 100 }}
+          />
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </SafeAreaView>
+          <Label text="Vị trí làm việc" />
+          <View style={styles.row}>
+            <LockedInput value={storeLat} />
+            <LockedInput value={storeLng} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.mapBtn}
+            onPress={async () => {
+              await saveDraft();
+              router.push({
+                pathname: "../modal/map-picker",
+                params: {
+                  lat: storeLat || "10.762622",
+                  lng: storeLng || "106.660172",
+                },
+              });
+            }}
+          >
+            <Text style={styles.mapText}>Chọn trên bản đồ</Text>
+          </TouchableOpacity>
+
+          <View style={styles.switchRow}>
+            <Text>Đang nhận khách</Text>
+            <Switch value={isActive} onValueChange={setIsActive} />
+          </View>
+
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+            <Text style={styles.saveText}>Lưu thay đổi</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    </>
   );
 }
+
+/* =========================
+   UI COMPONENTS
+========================= */
+const Label = ({ text }: { text: string }) => (
+  <Text style={{ marginTop: 14, marginBottom: 6 }}>{text}</Text>
+);
+
+const Input = (props: any) => (
+  <TextInput {...props} style={[styles.input, props.style]} />
+);
+
+const LockedInput = ({ value }: { value: string }) => (
+  <View style={styles.lockWrap}>
+    <TextInput value={value} editable={false} style={{ flex: 1 }} />
+    <Lock size={14} />
+  </View>
+);
 
 /* =========================
    STYLES
 ========================= */
 const styles = StyleSheet.create({
-  contentContainer: { flex: 1, padding: 18, backgroundColor: "#F8FAFC" },
   header: {
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 20,
-    color: "#1F2937",
+    height: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    backgroundColor: "#FFF",
+    borderBottomWidth: 1,
+    borderColor: "#E5E7EB",
   },
-  label: {
-    fontSize: 14,
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 16,
     fontWeight: "600",
-    marginTop: 14,
-    marginBottom: 6,
-    color: "#1F2937",
+    color: "#111827",
+  },
+  container: {
+    padding: 16,
+    paddingBottom: 40,
   },
   input: {
-    backgroundColor: "#fff",
+    borderWidth: 1,
     borderColor: "#E5E7EB",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    fontSize: 14,
-    color: "#1F2937",
-  },
-  locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
-  lockedInputWrapper: { flex: 1, position: "relative" },
-  locationInput: {
-    backgroundColor: "#E5E7EB",
-    borderColor: "#D1D5DB",
-    borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: "#6B7280",
-    paddingRight: 40,
+    backgroundColor: "#FFF",
   },
-  lockIcon: { position: "absolute", right: 12, top: 12 },
-  mapBtn: {
-    marginTop: 16,
-    backgroundColor: "#2563EB",
-    paddingVertical: 13,
-    borderRadius: 10,
+  row: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  lockWrap: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: "#F3F4F6",
+    gap: 6,
   },
-  mapText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  mapBtn: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "#2563EB",
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  mapText: {
+    color: "#2563EB",
+    textAlign: "center",
+    fontWeight: "600",
+  },
   switchRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 22,
-    alignItems: "center",
+    marginTop: 20,
   },
   saveBtn: {
     marginTop: 24,
-    backgroundColor: "#2563EB",
     paddingVertical: 14,
-    borderRadius: 10,
+    backgroundColor: "#2563EB",
+    borderRadius: 12,
   },
   saveText: {
-    color: "#fff",
-    fontSize: 15,
+    color: "#FFF",
     textAlign: "center",
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

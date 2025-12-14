@@ -1,38 +1,45 @@
 // app/_layout.tsx
 
 import { Slot } from "expo-router";
-import { View, ActivityIndicator, Platform, StyleSheet } from "react-native";
+import {
+  View,
+  ActivityIndicator,
+  Platform,
+  StyleSheet,
+} from "react-native";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import Toast from "react-native-toast-message";
 import { StatusBar } from "expo-status-bar";
 
+// 👉 GESTURE ROOT (FIX CRASH SWIPEABLE)
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+
 // 👉 AUTH
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 
-// 👉 NOTIFICATIONS (FIX FOREGROUND)
+// 👉 NOTIFICATIONS
 import * as Notifications from "expo-notifications";
-import type { NotificationBehavior } from "expo-notifications";
 
 /* ============================================================
-   🔔 GLOBAL NOTIFICATION HANDLER
+   🔔 GLOBAL NOTIFICATION HANDLER (API MỚI – KHÔNG WARNING)
    ⚠️ PHẢI ĐẶT NGOÀI COMPONENT
 ============================================================ */
 Notifications.setNotificationHandler({
   handleNotification: async () => {
-  console.log("🔔 [GLOBAL] Notification received (foreground enabled)");
-  return {
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  } as NotificationBehavior;
-},
-
+    console.log("🔔 [GLOBAL] Notification received (foreground enabled)");
+    return {
+      shouldShowBanner: true, // ✅ thay cho shouldShowAlert
+      shouldShowList: true,   // ✅ thay cho shouldShowAlert
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 /* ============================================================
-   Fix lỗi reanimated trên android cũ (giữ nguyên)
+   Fix lỗi reanimated trên android cũ (GIỮ NGUYÊN)
 ============================================================ */
 if (Platform.OS === "android") {
   try {
@@ -53,7 +60,7 @@ function RootLayoutNav() {
     // custom fonts nếu có
   });
 
-  const { user, isInitialized } = useAuth();
+  const { isInitialized } = useAuth();
 
   useEffect(() => {
     if (error) throw error;
@@ -84,9 +91,11 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }
 

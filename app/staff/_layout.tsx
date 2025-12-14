@@ -1,28 +1,25 @@
 import { Stack, Redirect } from "expo-router";
 import { useAuth } from "../../hooks/useAuth";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function StaffLayout() {
   const { user } = useAuth();
 
-  console.log("STAFF USER:", user);
-
-  // ❌ Nếu chưa login → về login
   if (!user) {
     return <Redirect href="/(auth)/login" />;
   }
 
-  // ❌ Nếu là user role 3 → ép về UI user
   if (user.roleId !== 2) {
     return <Redirect href="/(tabs)" />;
   }
 
-  // ✔ Staff hợp lệ → render UI staff
   return (
-    <Stack
-      screenOptions={{
-        headerShown: true,
-        headerTitle: "Staff Panel"
-      }}
-    />
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+        }}
+      />
+    </SafeAreaView>
   );
 }
