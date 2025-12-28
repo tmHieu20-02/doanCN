@@ -2,13 +2,20 @@ import { Redirect } from "expo-router";
 import { useAuth } from "../hooks/useAuth";
 
 export default function Index() {
-  const { user, isLoading } = useAuth();
+  const { user, isInitialized } = useAuth();
 
-  if (isLoading) return null;
+  if (!isInitialized) return null;
 
-  if (user) {
-    return <Redirect href="/(tabs)" />;
+  // ❌ chưa login
+  if (!user) {
+    return <Redirect href="/(auth)/login" />;
   }
 
-  return <Redirect href="/(auth)/login" />;
+  // ✅ staff
+  if (user.roleId === 2) {
+    return <Redirect href="/staff/(stafftabs)" />;
+  }
+
+  // ✅ user thường
+  return <Redirect href="/(tabs)" />;
 }

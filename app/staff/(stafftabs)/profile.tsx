@@ -13,6 +13,7 @@ import * as ImagePicker from "expo-image-picker";
 import api from "@/utils/api";
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function StaffProfile() {
   const router = useRouter();

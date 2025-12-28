@@ -9,13 +9,13 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
-  // Đã bỏ import StatusBar của react-native vì dùng của expo-status-bar
-} from 'react-native';
-// THAY ĐỔI QUAN TRỌNG: Import SafeAreaView từ thư viện context
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from "expo-status-bar"; // Import StatusBar của Expo
 
-// ... các imports và types khác giữ nguyên logic (như code bạn gửi)
+} from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from "expo-status-bar"; // 
+
+
 import {
   Calendar,
   Clock,
@@ -84,7 +84,7 @@ export type Booking = {
   hasReview?: boolean;
 };
 
-// ... component EmptyState giữ nguyên logic
+// ... component EmptyState
 
 const EmptyState = ({
   icon,
@@ -111,9 +111,8 @@ const EmptyState = ({
   </View>
 );
 
-/* ------------------------------------------------------------ */
+
 /* MAIN COMPONENT */
-/* ------------------------------------------------------------ */
 
 export default function BookingsScreen() {
   const router = useRouter();
@@ -358,72 +357,63 @@ export default function BookingsScreen() {
 
         {/* FOOTER */}
         <View style={styles.bookingFooter}>
-          <Text style={styles.price}>{formatPrice(item.price)}</Text>
+  {/* Thêm View bọc giá tiền để đẩy các nút sang phải */}
+  <View style={{ flex: 1 }}>
+    <Text style={styles.price}>{formatPrice(item.price)}</Text>
+  </View>
 
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Phone size={18} color={colors.primaryDark} />
-            </TouchableOpacity>
+  <View style={styles.actionButtons}>
+    <TouchableOpacity style={styles.iconButton}>
+      <Phone size={18} color={colors.primaryDark} />
+    </TouchableOpacity>
 
-            <TouchableOpacity style={styles.iconButton}>
-              <MessageCircle size={18} color={colors.primaryDark} />
-            </TouchableOpacity>
+    <TouchableOpacity style={styles.iconButton}>
+      <MessageCircle size={18} color={colors.primaryDark} />
+    </TouchableOpacity>
 
-            {/* UPCOMING = CANCEL */}
-            {activeTab === 'upcoming' && item.canCancel && (
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => handleCancelBooking(item.id)}
-              >
-                <Text style={styles.cancelButtonText}>Hủy lịch</Text>
-              </TouchableOpacity>
-            )}
+    {/* Nút Hủy lịch */}
+    {activeTab === 'upcoming' && item.canCancel && (
+      <TouchableOpacity
+        style={styles.cancelButton}
+        onPress={() => handleCancelBooking(item.id)}
+      >
+        <Text style={styles.cancelButtonText}>Hủy lịch</Text>
+      </TouchableOpacity>
+    )}
 
-            {/* COMPLETED = REVIEW + REBOOK */}
-            {activeTab === 'completed' && (
-              <>
-                {!item.hasReview && (
-                  <TouchableOpacity
-                    style={styles.reviewButton}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/rating/create",
-                        params: {
-                          serviceId: item.serviceId,
-                          bookingId: item.id
-                        }
-                      })
-                    }
-                  >
-                    <Text style={styles.reviewButtonText}>Đánh giá</Text>
-                  </TouchableOpacity>
-                )}
+    {/* Các nút Đánh giá / Đặt lại giữ nguyên logic của bạn */}
+    {activeTab === 'completed' && (
+      <>
+        {!item.hasReview && (
+          <TouchableOpacity
+            style={styles.reviewButton}
+            onPress={() => router.push({
+                pathname: "/rating/create",
+                params: { serviceId: item.serviceId, bookingId: item.id }
+            })}
+          >
+            <Text style={styles.reviewButtonText}>Đánh giá</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={styles.rebookButton}
+          onPress={() => router.push(`/service/${item.serviceId}?rebook=1`)}
+        >
+          <Text style={styles.rebookButtonText}>Đặt lại</Text>
+        </TouchableOpacity>
+      </>
+    )}
 
-                <TouchableOpacity
-                  style={styles.rebookButton}
-                  onPress={() =>
-                    router.push(`/service/${item.serviceId}?rebook=1`)
-                  }
-                >
-                  <Text style={styles.rebookButtonText}>Đặt lại</Text>
-                </TouchableOpacity>
-              </>
-            )}
-
-            {/* CANCELLED = ONLY REBOOK */}
-            {activeTab === 'cancelled' && (
-              <TouchableOpacity
-                style={styles.rebookButton}
-                onPress={() =>
-                  router.push(`/service/${item.serviceId}?rebook=1`)
-                }
-              >
-                <Text style={styles.rebookButtonText}>Đặt lại</Text>
-              </TouchableOpacity>
-            )}
-
-          </View>
-        </View>
+    {activeTab === 'cancelled' && (
+      <TouchableOpacity
+        style={styles.rebookButton}
+        onPress={() => router.push(`/service/${item.serviceId}?rebook=1`)}
+      >
+        <Text style={styles.rebookButtonText}>Đặt lại</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+</View>
       </View>
     );
   };
@@ -523,12 +513,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#FFF',
+    color: '#000',
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
+    color: '#000',
   },
 
   tabsContainer: {
@@ -642,13 +632,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  bookingFooter: {
-  flexDirection: 'column', // ✅ FIX TRÀN
-  borderTopWidth: 1,
-  borderTopColor: '#F3F4F6',
-  paddingTop: 14,
-  gap: 12,
-},
+ bookingFooter: {
+    flexDirection: 'row', // Xếp hàng ngang
+    alignItems: 'center', // Căn giữa theo chiều dọc
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 14,
+  },
 
 
   price: {
@@ -657,12 +647,11 @@ const styles = StyleSheet.create({
     color: colors.primaryAlt,
   },
 
-  actionButtons: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  flexWrap: 'wrap', // ✅ FIX TRÀN
-  gap: 8,
-},
+ actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8, // Khoảng cách giữa các nút bấm
+  },
 
 
   iconButton: {

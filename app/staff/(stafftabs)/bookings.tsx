@@ -115,6 +115,7 @@ export default function StaffBooking() {
           text: "Hủy tất cả",
           style: "destructive",
           onPress: async () => {
+            console.log("Đang gọi lệnh hủy tất cả...");
             try {
               await cancelAllService({
                 cancel_note: "Shop nghỉ đột xuất",

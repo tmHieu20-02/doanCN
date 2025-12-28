@@ -9,6 +9,8 @@ import {
   SafeAreaView,
   Dimensions,
   ActivityIndicator,
+  StatusBar,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import {
@@ -18,365 +20,228 @@ import {
   Clock,
   Heart,
   Calendar,
-  CheckCircle,
+  Share2,
 } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-
-import { colors, radius, shadow, spacing } from "@/ui/theme";
+import { colors, spacing } from "@/ui/theme";
 
 const { width: screenWidth } = Dimensions.get("window");
 
 export default function ServiceDetailScreen() {
   const { id } = useLocalSearchParams();
-
   const [service, setService] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
 
-  /** =====================================================================
-   *  FETCH SERVICE DETAIL – GIỮ NGUYÊN LOGIC GỐC CỦA BẠN
-   *  ===================================================================== */
-  const fetchServiceDetail = async () => {
+  /* =====================================================================
+   * 1. LOAD DATA & ĐỒNG BỘ TRẠNG THÁI
+   * ===================================================================== */
+  const fetchData = async () => {
     try {
+      setLoading(true);
       const session = await SecureStore.getItemAsync("my-user-session");
       const token = session ? JSON.parse(session).token : null;
 
-      const res = await fetch("https://phatdat.store/api/v1/service/get-all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const [resService, resFav] = await Promise.all([
+        fetch("https://phatdat.store/api/v1/service/get-all", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("https://phatdat.store/api/v1/favorite/get-all", {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      ]);
 
-      const json = await res.json();
+      const jsonService = await resService.json();
+      const jsonFav = await resFav.json();
 
-      if (!json?.data) {
-        setLoading(false);
-        return;
-      }
-
-      console.log("DEBUG LIST SERVICE:", json.data.map((s: any) => s.id));
-      console.log("DEBUG ID NHẬN ĐƯỢC:", id);
-
-      /** 
-       *  FIX DUY NHẤT: đảm bảo so sánh ID đúng dạng số,
-       *  không đổi bất kỳ logic nào khác.
-       */
-      const found = json.data.find(
-        (s: any) => Number(s.id) === Number(id?.toString().trim())
-      );
+      const found = jsonService.data?.find((s: any) => Number(s.id) === Number(id));
+      const isExistInFav = jsonFav.data?.some((f: any) => Number(f.service_id) === Number(id));
 
       if (found) {
         setService({
           ...found,
-          image_list: [
-            found.image || "https://picsum.photos/400",
-            found.image || "https://picsum.photos/400?2",
-          ],
-          duration_text: `${found.duration_minutes} phút`,
-          rating: found.rating || 0,
-          reviewCount: found.reviewCount || 0,
+          image_list: [found.image || "https://picsum.photos/800/600", "https://picsum.photos/800/600?sig=1"],
+          duration_text: `${found.duration_minutes || 30} phút`,
         });
+        setIsFavorited(!!isExistInFav);
       }
-
-      setLoading(false);
     } catch (e) {
-      console.log("LOAD SERVICE ERROR:", e);
+      console.log("LOAD DATA ERROR:", e);
+    } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchServiceDetail();
-  }, [id]);
+  useEffect(() => { fetchData(); }, [id]);
 
-  /** =====================================================================
-   *  UI – KHÔNG ĐỔI BẤT KỲ GÌ
-   *  ===================================================================== */
+  /* =====================================================================
+   * 2. TOGGLE FAVORITE (FIXED LOGIC DELETE)
+   * ===================================================================== */
+  const toggleFavorite = async () => {
+    const previousState = isFavorited;
+    setIsFavorited(!previousState); // Optimistic UI
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 100 }} />
-      </SafeAreaView>
-    );
-  }
+    try {
+      const session = await SecureStore.getItemAsync("my-user-session");
+      const token = session ? JSON.parse(session).token : null;
 
-  if (!service) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={{ padding: spacing(5) }}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={{ fontSize: 16 }}>← Quay lại</Text>
-          </TouchableOpacity>
+      if (!token) {
+        Alert.alert("Thông báo", "Vui lòng đăng nhập");
+        setIsFavorited(previousState);
+        return;
+      }
 
-          <Text style={styles.notFoundTitle}>Dịch vụ không tồn tại</Text>
-          <Text style={{ marginTop: 10 }}>Không tìm thấy dịch vụ ID: {id}</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+      const isRemoving = previousState === true;
+      const url = isRemoving 
+        ? `https://phatdat.store/api/v1/favorite/delete/${id}` 
+        : `https://phatdat.store/api/v1/favorite/create`;
+      
+      const res = await fetch(url, {
+        method: isRemoving ? "DELETE" : "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: isRemoving ? null : JSON.stringify({ service_id: id }),
+      });
+
+      // QUAN TRỌNG: Kiểm tra res.ok thay vì chỉ kiểm tra json.err
+      if (!res.ok) {
+         // Nếu không phải 200 hay 204 thì rollback
+         throw new Error("API Error");
+      }
+
+    } catch (error) {
+      setIsFavorited(previousState); // Hoàn tác nếu lỗi
+      Alert.alert("Lỗi", "Không thể thực hiện thao tác này");
+      console.log("TOGGLE ERROR:", error);
+    }
+  };
+
+  if (loading) return (
+    <View style={styles.loadingCenter}>
+      <ActivityIndicator size="large" color="#FF6F00" />
+    </View>
+  );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconCircle} onPress={() => router.back()}>
-          <ArrowLeft size={24} color={colors.text} />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      
+      {/* FLOAT HEADER */}
+      <View style={styles.floatHeader}>
+        <TouchableOpacity style={styles.blurBtn} onPress={() => router.back()}>
+          <ArrowLeft size={22} color="#FFF" />
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.iconCircle}
-          onPress={() => setIsFavorited(!isFavorited)}
-        >
-          <Heart
-            size={24}
-            color={isFavorited ? colors.danger : colors.textMuted}
-            fill={isFavorited ? colors.danger : "none"}
-          />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.blurBtn} onPress={toggleFavorite}>
+            <Heart 
+              size={22} 
+              color={isFavorited ? "#FF4B4B" : "#FFF"} 
+              fill={isFavorited ? "#FF4B4B" : "transparent"} 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* IMAGE SLIDER */}
-        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-          {service.image_list.map((img: string, i: number) => (
-            <Image
-              key={i}
-              source={{ uri: img }}
-              style={[styles.serviceImage, { width: screenWidth }]}
-            />
-          ))}
-        </ScrollView>
-
-        {/* BASIC INFO */}
-        <View style={styles.basicInfo}>
-          <Text style={styles.serviceName}>{service.name}</Text>
-          <Text style={styles.serviceCategory}>Danh mục #{service.category_id}</Text>
-
-          <View style={styles.ratingRow}>
-            <Star size={18} color={colors.warning} fill={colors.warning} />
-            <Text style={styles.rating}>{service.rating}</Text>
-            <Text style={styles.reviewCount}>({service.reviewCount} đánh giá)</Text>
-          </View>
-
-          <View style={styles.detailsRow}>
-            <View style={styles.detailItem}>
-              <MapPin size={16} color={colors.textMuted} />
-              <Text style={styles.detailText}>0.5km</Text>
+      <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+        <View style={styles.heroSection}>
+          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
+            {service?.image_list.map((img: string, i: number) => (
+              <Image key={i} source={{ uri: img }} style={styles.heroImage} />
+            ))}
+          </ScrollView>
+          <LinearGradient colors={["transparent", "rgba(0,0,0,0.8)"]} style={styles.heroOverlay} />
+          <View style={styles.heroContent}>
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>DANH MỤC #{service?.category_id}</Text>
             </View>
-
-            <View style={styles.detailItem}>
-              <Clock size={16} color={colors.textMuted} />
-              <Text style={styles.detailText}>{service.duration_text}</Text>
-            </View>
+            <Text style={styles.serviceTitle}>{service?.name}</Text>
           </View>
         </View>
 
-        {/* PRICE */}
-        <View style={styles.priceSection}>
-          <Text style={styles.currentPrice}>
-            {Number(service.price).toLocaleString("vi-VN")}đ
-          </Text>
-          <Text style={styles.priceNote}>Giá đã bao gồm VAT</Text>
-        </View>
+        <View style={styles.contentCard}>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Star size={20} color="#FFB100" fill="#FFB100" />
+              <Text style={styles.statValue}>{service?.average_rating || 5.0}</Text>
+              <Text style={styles.statLabel}>Xếp hạng</Text>
+            </View>
+            <View style={[styles.statItem, styles.statBorder]}>
+              <Clock size={20} color="#FF6F00" />
+              <Text style={styles.statValue}>{service?.duration_text}</Text>
+              <Text style={styles.statLabel}>Thời gian</Text>
+            </View>
+            <View style={styles.statItem}>
+              <MapPin size={20} color="#FF4B4B" />
+              <Text style={styles.statValue}>0.5km</Text>
+              <Text style={styles.statLabel}>Gần đây</Text>
+            </View>
+          </View>
 
-        {/* DESCRIPTION */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mô tả</Text>
-          <Text style={styles.description}>{service.description}</Text>
+          <Text style={styles.subSectionTitle}>Mô tả dịch vụ</Text>
+          <Text style={styles.descriptionText}>{service?.description || "Đang cập nhật..."}</Text>
+          
+          <View style={styles.highlightBox}>
+             <View style={styles.highlightItem}>
+                <Text style={styles.highlightEmoji}>✨</Text>
+                <Text style={styles.highlightText}>Chất lượng phục vụ 5 sao</Text>
+             </View>
+          </View>
         </View>
-
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* BUTTON */}
-      <View style={styles.bottomAction}>
-        <TouchableOpacity
-          style={styles.bookButton}
-          onPress={() =>
-            router.push({
-              pathname: "/booking/create",
-              params: { serviceId: id?.toString() },
-            })
-          }
+      <View style={styles.bottomBar}>
+        <View style={styles.priceContainer}>
+          <Text style={styles.priceLabel}>Giá trọn gói</Text>
+          <Text style={styles.priceValue}>{Number(service?.price).toLocaleString("vi-VN")}đ</Text>
+        </View>
+        <TouchableOpacity 
+            style={styles.primaryBtn}
+            onPress={() => router.push({ pathname: "/booking/create", params: { serviceId: id?.toString() } })}
         >
-          <Calendar size={20} color={colors.text} />
-          <Text style={styles.bookButtonText}>Đặt lịch ngay</Text>
+          <LinearGradient colors={["#FFB100", "#FF6F00"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientBtn}>
+            <Calendar size={20} color="#FFF" />
+            <Text style={styles.primaryBtnText}>Đặt lịch ngay</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8F8F8" },
-
-  /* HEADER */
-  header: {
-    position: "absolute",
-    top: 48,
-    left: 0,
-    right: 0,
-    zIndex: 50,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-
-  iconCircle: {
-    width: 42,
-    height: 42,
-    backgroundColor: "rgba(255,255,255,0.95)",
-    borderRadius: 21,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-  },
-
-  /* IMAGE */
-  serviceImage: {
-    height: 330,
-    width: screenWidth,
-    resizeMode: "cover",
-  },
-
-  /* CONTENT BLOCK */
-  basicInfo: {
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    marginTop: -20,
-    borderBottomWidth: 1,
-    borderColor: "#EFEFEF",
-  },
-
-  serviceName: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#222",
-  },
-
-  serviceCategory: {
-    fontSize: 14,
-    marginTop: 4,
-    color: "#777",
-  },
-
-  ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 14,
-  },
-
-  rating: {
-    marginLeft: 6,
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#222",
-  },
-
-  reviewCount: {
-    marginLeft: 6,
-    fontSize: 13,
-    color: "#888",
-  },
-
-  detailsRow: {
-    flexDirection: "row",
-    marginTop: 16,
-    gap: 30,
-  },
-
-  detailItem: { flexDirection: "row", alignItems: "center" },
-  detailText: { marginLeft: 6, color: "#777", fontSize: 14 },
-
-  /* PRICE BLOCK — PHẲNG VÀ GỌN */
-  priceSection: {
-    marginTop: 14,
-    backgroundColor: "#FFFFFF",
-    padding: 18,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-  },
-
-  currentPrice: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: colors.primaryAlt,
-  },
-
-  priceNote: {
-    marginTop: 4,
-    color: "#999",
-    fontSize: 12,
-  },
-
-  /* DESCRIPTION BLOCK */
-  section: {
-    backgroundColor: "#FFFFFF",
-    padding: 20,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginTop: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-  },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 6,
-    color: "#222",
-  },
-
-  description: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#666",
-  },
-
-  /* BOTTOM BUTTON */
-  bottomAction: {
-    position: "absolute",
-    bottom: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: "transparent",
-  },
-
-  bookButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 50,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-  },
-
-  bookButtonText: {
-    color: "#222",
-    fontSize: 16,
-    fontWeight: "700",
-    marginLeft: 8,
-  },
-  notFoundTitle: {
-  fontSize: 22,
-  fontWeight: "700",
-  marginTop: spacing(5),
-  textAlign: "center",
-  color: colors.text,
-},
-
+  container: { flex: 1, backgroundColor: "#FFF" },
+  loadingCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  floatHeader: { position: "absolute", top: 45, left: 0, right: 0, zIndex: 100, flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 20 },
+  headerRight: { flexDirection: 'row', gap: 12 },
+  blurBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
+  heroSection: { height: 400, width: screenWidth },
+  heroImage: { width: screenWidth, height: 400, resizeMode: "cover" },
+  heroOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, height: 200 },
+  heroContent: { position: "absolute", bottom: 40, left: 20, right: 20 },
+  categoryBadge: { backgroundColor: "#FF6F00", alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginBottom: 10 },
+  categoryText: { color: "#FFF", fontSize: 10, fontWeight: "800" },
+  serviceTitle: { fontSize: 32, fontWeight: "800", color: "#FFF" },
+  contentCard: { marginTop: -30, backgroundColor: "#FFF", borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24 },
+  statsRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 25 },
+  statItem: { flex: 1, alignItems: "center" },
+  statBorder: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: "#F0F0F0" },
+  statValue: { fontSize: 16, fontWeight: "700", color: "#222", marginTop: 5 },
+  statLabel: { fontSize: 12, color: "#999", marginTop: 2 },
+  subSectionTitle: { fontSize: 18, fontWeight: "700", color: "#222", marginBottom: 12 },
+  descriptionText: { fontSize: 15, lineHeight: 24, color: "#666", marginBottom: 20 },
+  highlightBox: { backgroundColor: "#F9F9F9", padding: 16, borderRadius: 16, gap: 12 },
+  highlightItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  highlightEmoji: { fontSize: 16 },
+  highlightText: { fontSize: 14, color: "#444", fontWeight: '500' },
+  bottomBar: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "#FFF", flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingTop: 15, paddingBottom: 35, borderTopWidth: 1, borderColor: "#F0F0F0", gap: 15 },
+  priceContainer: { flex: 1 },
+  priceLabel: { fontSize: 12, color: "#999", fontWeight: '600' },
+  priceValue: { fontSize: 22, fontWeight: "800", color: "#FF6F00" },
+  primaryBtn: { flex: 1.5, borderRadius: 16, overflow: 'hidden' },
+  gradientBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, gap: 8 },
+  primaryBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 });

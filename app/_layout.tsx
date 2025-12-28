@@ -1,19 +1,14 @@
 // app/_layout.tsx
 
 import { Slot } from "expo-router";
-import {
-  View,
-  ActivityIndicator,
-  Platform,
-  StyleSheet,
-} from "react-native";
+import { View, ActivityIndicator, Platform, StyleSheet } from "react-native";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import Toast from "react-native-toast-message";
 import { StatusBar } from "expo-status-bar";
 
-// 👉 GESTURE ROOT (FIX CRASH SWIPEABLE)
+// ✅ GESTURE ROOT (BẮT BUỘC CHO Swipeable)
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 // 👉 AUTH
@@ -21,26 +16,18 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 
 // 👉 NOTIFICATIONS
 import * as Notifications from "expo-notifications";
+import type { NotificationBehavior } from "expo-notifications";
 
-/* ============================================================
-   🔔 GLOBAL NOTIFICATION HANDLER (API MỚI – KHÔNG WARNING)
-   ⚠️ PHẢI ĐẶT NGOÀI COMPONENT
-============================================================ */
 Notifications.setNotificationHandler({
-  handleNotification: async () => {
-    console.log("🔔 [GLOBAL] Notification received (foreground enabled)");
-    return {
-      shouldShowBanner: true, // ✅ thay cho shouldShowAlert
-      shouldShowList: true,   // ✅ thay cho shouldShowAlert
+  handleNotification: async () =>
+    ({
+      shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
-    };
-  },
+    } as NotificationBehavior),
 });
 
-/* ============================================================
-   Fix lỗi reanimated trên android cũ (GIỮ NGUYÊN)
-============================================================ */
+// Fix reanimated android (giữ nguyên)
 if (Platform.OS === "android") {
   try {
     // @ts-ignore
@@ -48,18 +35,13 @@ if (Platform.OS === "android") {
     if (hook && typeof hook.inject === "function") {
       hook.inject = function () {};
     }
-  } catch (e) {}
+  } catch {}
 }
-
-/* ============================================================ */
 
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  const [loaded, error] = useFonts({
-    // custom fonts nếu có
-  });
-
+  const [loaded, error] = useFonts({});
   const { isInitialized } = useAuth();
 
   useEffect(() => {
@@ -67,9 +49,7 @@ function RootLayoutNav() {
   }, [error]);
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
+    if (loaded) SplashScreen.hideAsync();
   }, [loaded]);
 
   if (!loaded || !isInitialized) {
@@ -99,11 +79,6 @@ export default function RootLayout() {
   );
 }
 
-/* ============================================================ */
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
+  container: { flex: 1, backgroundColor: "#fff" },
 });

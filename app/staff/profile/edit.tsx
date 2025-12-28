@@ -36,7 +36,6 @@ export default function EditStaffProfile() {
 
   /* =========================
      LOAD PROFILE / DRAFT
-     (Draft KHÔNG set lat/lng)
   ========================= */
   useEffect(() => {
     const load = async () => {
@@ -49,6 +48,8 @@ export default function EditStaffProfile() {
         setExperience(d.experience || "");
         setBio(d.bio || "");
         setIsActive(d.isActive ?? true);
+        setStoreLat(d.storeLat || "");
+        setStoreLng(d.storeLng || "");
         return;
       }
 
@@ -72,7 +73,6 @@ export default function EditStaffProfile() {
 
   /* =========================
      UPDATE FROM MAP PICKER
-     (Map là source of truth)
   ========================= */
   useEffect(() => {
     if (params.selectedLat && params.selectedLng) {
@@ -82,7 +82,6 @@ export default function EditStaffProfile() {
       setStoreLat(lat);
       setStoreLng(lng);
 
-      // 🔥 Update lại draft với vị trí MỚI
       SecureStore.setItemAsync(
         DRAFT_KEY,
         JSON.stringify({
@@ -99,7 +98,7 @@ export default function EditStaffProfile() {
   }, [params.selectedLat, params.selectedLng]);
 
   /* =========================
-     SAVE DRAFT (TRƯỚC KHI MỞ MAP)
+     SAVE DRAFT
   ========================= */
   const saveDraft = async () => {
     await SecureStore.setItemAsync(
@@ -117,7 +116,7 @@ export default function EditStaffProfile() {
   };
 
   /* =========================
-     SAVE PROFILE (FINAL)
+     SAVE PROFILE
   ========================= */
   const handleSave = async () => {
     if (!storeName.trim()) {
@@ -174,7 +173,6 @@ export default function EditStaffProfile() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <SafeAreaView style={{ flex: 1, backgroundColor: "#F9FAFB" }}>
-        {/* Header custom */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={22} color="#111827" />
@@ -216,12 +214,13 @@ export default function EditStaffProfile() {
             onPress={async () => {
               await saveDraft();
               router.push({
-                pathname: "../modal/map-picker",
+                pathname: "/staff/modal/map-picker" as any,
                 params: {
                   lat: storeLat || "10.762622",
                   lng: storeLng || "106.660172",
                 },
               });
+
             }}
           >
             <Text style={styles.mapText}>Chọn trên bản đồ</Text>

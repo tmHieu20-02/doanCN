@@ -9,13 +9,6 @@ export default function ProfileLayout() {
           headerTitle: "",
         }}
       />
-      <Stack.Screen
-        name="../modal/map-picker"
-        options={{
-          presentation: "modal",
-          headerTitle: "Chọn vị trí",
-        }}
-      />
     </Stack>
   );
 }

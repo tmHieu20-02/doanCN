@@ -7,13 +7,13 @@ import {
   TouchableOpacity,
   Image,
   Switch,
-  // LOẠI BỎ SafeAreaView cũ
-  // SafeAreaView,
   Animated,
+  Platform,
+  Dimensions,
 } from "react-native";
 
-// IMPORT SafeAreaView TỪ CONTEXT
-import { SafeAreaView } from "react-native-safe-area-context";
+// FIX LỖI: Import useSafeAreaInsets
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "../../hooks/useAuth";
 import { useRouter } from "expo-router";
@@ -30,35 +30,33 @@ import {
   Shield,
   LogOut,
   ChevronRight,
-  Edit3,
   Star,
-  Calendar,
-  Gift,
+  Camera,
 } from "lucide-react-native";
 
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import { uploadAvatar } from "@/utils/uploadAvatar";
-import { colors, radius, shadow, spacing } from "@/ui/theme";
+import { colors, radius, shadow } from "@/ui/theme";
 
 /* ================================ MENU CONFIG ================================ */
 
 const menuSections = [
   {
-    title: "Tài khoản",
+    title: "Tài khoản cá nhân",
     items: [
-      { id: "edit-profile", name: "Chỉnh sửa hồ sơ", icon: "edit", color: colors.primary },
-      { id: "addresses", name: "Địa chỉ của tôi", icon: "map-pin", color: colors.success },
-      { id: "payment", name: "Phương thức thanh toán", icon: "credit-card", color: colors.warning },
-      { id: "favorites", name: "Dịch vụ yêu thích", icon: "heart", color: "#EC4899" },
+      { id: "edit-profile", name: "Chỉnh sửa hồ sơ", icon: <User size={20} color="#6366F1" />, bgColor: "#EEF2FF" },
+      { id: "addresses", name: "Địa chỉ đã lưu", icon: <MapPin size={20} color="#10B981" />, bgColor: "#ECFDF5" },
+      { id: "payment", name: "Thanh toán", icon: <CreditCard size={20} color="#F59E0B" />, bgColor: "#FFFBEB" },
+      { id: "favorites", name: "Dịch vụ yêu thích", icon: <Heart size={20} color="#EF4444" />, bgColor: "#FEF2F2" },
     ],
   },
   {
-    title: "Cài đặt & hỗ trợ",
+    title: "Ứng dụng & Hỗ trợ",
     items: [
-      { id: "notifications", name: "Thông báo", icon: "bell", color: "#06B6D4", hasSwitch: true },
-      { id: "privacy", name: "Quyền riêng tư", icon: "shield", color: "#8B5CF6" },
-      { id: "help", name: "Trợ giúp & hỗ trợ", icon: "help-circle", color: colors.success },
+      { id: "notifications", name: "Thông báo đẩy", icon: <Bell size={20} color="#3B82F6" />, bgColor: "#EFF6FF", hasSwitch: true },
+      { id: "privacy", name: "Quyền riêng tư", icon: <Shield size={20} color="#8B5CF6" />, bgColor: "#F5F3FF" },
+      { id: "help", name: "Trung tâm trợ giúp", icon: <HelpCircle size={20} color="#6B7280" />, bgColor: "#F9FAFB" },
     ],
   },
 ];
@@ -68,6 +66,7 @@ const menuSections = [
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const insets = useSafeAreaInsets(); // Hook lấy khoảng cách tai thỏ/status bar
 
   const [avatarUrl, setAvatarUrl] = useState(
     user?.avatar ? user.avatar : "https://phatdat.store/default-avatar.png"
@@ -77,36 +76,25 @@ export default function ProfileScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  /* ===================== FIX QUAN TRỌNG: SYNC SESSION SAU UPDATE ===================== */
-
   useEffect(() => {
     const syncSession = async () => {
       const stored = await SecureStore.getItemAsync("my-user-session");
       if (stored) {
         const data = JSON.parse(stored);
-
-        if (user && data.full_name) {
-          user.full_name = data.full_name;
-        }
-
+        if (user && data.full_name) user.full_name = data.full_name;
         if (data.avatar) setAvatarUrl(data.avatar);
       }
     };
-
     syncSession();
   }, []);
 
-  /* ================================ AVATAR PICKER ================================ */
-
   const openPickerSheet = () => {
     setShowPicker(true);
-    Animated.timing(slideAnim, { toValue: 1, duration: 260, useNativeDriver: true }).start();
+    Animated.spring(slideAnim, { toValue: 1, useNativeDriver: true, bounciness: 5 }).start();
   };
 
   const closePickerSheet = () => {
-    Animated.timing(slideAnim, { toValue: 0, duration: 240, useNativeDriver: true }).start(() =>
-      setShowPicker(false)
-    );
+    Animated.timing(slideAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setShowPicker(false));
   };
 
   const handleChangeAvatar = async () => {
@@ -115,385 +103,365 @@ export default function ProfileScreen() {
       alert("Cần quyền truy cập thư viện ảnh.");
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
+      allowsEditing: true,
+      aspect: [1, 1],
     });
 
     if (result.canceled) return;
-
     const imageUri = result.assets[0].uri;
-
-    // Cập nhật UI ngay lập tức
     setAvatarUrl(imageUri);
 
-    // Lưu avatar mới vào session
     const stored = await SecureStore.getItemAsync("my-user-session");
     if (stored) {
       const session = JSON.parse(stored);
       session.avatar = imageUri;
       await SecureStore.setItemAsync("my-user-session", JSON.stringify(session));
     }
-
-    // ⚡ Thông báo ngay lập tức (không chờ upload)
-    alert("Cập nhật ảnh đại diện thành công!");
-
-    // ⚙ Upload chạy nền, không block UI
-    uploadAvatar(imageUri).catch(() => { });
-  };
-
-  /* ================================ RENDER ================================ */
-
-  const getIconComponent = (name: string, size = 20, color: string) => {
-    const p = { size, color };
-    switch (name) {
-      case "edit": return <Edit3 {...p} />;
-      case "map-pin": return <MapPin {...p} />;
-      case "credit-card": return <CreditCard {...p} />;
-      case "heart": return <Heart {...p} />;
-      case "bell": return <Bell {...p} />;
-      case "shield": return <Shield {...p} />;
-      case "help-circle": return <HelpCircle {...p} />;
-      case "calendar": return <Calendar {...p} />;
-      case "gift": return <Gift {...p} />;
-      default: return <User {...p} />;
-    }
+    uploadAvatar(imageUri).catch(() => {});
   };
 
   return (
-    // FIX: Dùng SafeAreaView từ Context
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-
-        {/* HEADER */}
-        <LinearGradient colors={[colors.primary, colors.primaryAlt]} style={styles.header}>
-          <View style={styles.headerTopRow}>
-            <View>
-              <Text style={styles.headerHello}>Hồ sơ</Text>
-              <Text style={styles.headerSubtitle}>Quản lý tài khoản và ưu đãi của bạn</Text>
-            </View>
-
-            <TouchableOpacity style={styles.settingsButton}>
-              <Settings size={20} color={colors.text} />
+        
+        {/* PREMIUM HEADER - Cân đối lại khoảng cách */}
+        <LinearGradient 
+          colors={["#FFE7C2", "#FFD08A"]} 
+          style={[styles.header, { paddingTop: insets.top + 10 }]}
+        >
+          <View style={styles.headerActionRow}>
+            <View />
+            <TouchableOpacity style={styles.glassButton}>
+              <Settings size={22} color="#4B5563" />
             </TouchableOpacity>
           </View>
 
-          {/* PROFILE */}
-          <View style={styles.profileSection}>
-            <View style={styles.avatarContainer}>
-              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-
-              <TouchableOpacity style={styles.editAvatarButton} onPress={openPickerSheet}>
-                <Edit3 size={16} color={colors.primaryDark} />
+          <View style={styles.profileMainRow}>
+            <View style={styles.avatarWrapper}>
+              <View style={styles.avatarBorder}>
+                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+              </View>
+              <TouchableOpacity style={styles.cameraBadge} onPress={openPickerSheet} activeOpacity={0.8}>
+                <Camera size={14} color="#FFF" fill="#4B5563" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.profileInfo}>
-              <Text style={styles.userName}>{user?.full_name || "Người dùng"}</Text>
-              {user?.email && <Text style={styles.userEmail}>{user.email}</Text>}
-              {user?.numberPhone && <Text style={styles.userPhone}>{user.numberPhone}</Text>}
-
-              <View style={styles.membershipBadge}>
-                <Star size={14} color={colors.warning} fill={colors.warning} />
-                <Text style={styles.membershipText}>Thành viên</Text>
+            <View style={styles.profileTextInfo}>
+              <Text style={styles.userNameText} numberOfLines={1}>
+                {user?.full_name || "Khách hàng"}
+              </Text>
+              <Text style={styles.userSubText}>
+                {user?.numberPhone || "09x-xxxx-xxx"}
+              </Text>
+              <View style={styles.statusBadge}>
+                <LinearGradient colors={["#F59E0B", "#D97706"]} start={{x:0, y:0}} end={{x:1, y:0}} style={styles.badgeGradient}>
+                  <Star size={10} color="#FFF" fill="#FFF" />
+                  <Text style={styles.badgeText}>Thành viên Vàng</Text>
+                </LinearGradient>
               </View>
             </View>
           </View>
         </LinearGradient>
 
-        {/* MENU */}
-        <View style={styles.menuContainer}>
-          {menuSections.map((section) => (
-            <View key={section.title} style={styles.menuSection}>
-              <Text style={styles.menuSectionTitle}>{section.title}</Text>
-
-              <View style={styles.menuCard}>
-                {section.items.map((item, index) => (
+        {/* MENU SECTIONS */}
+        <View style={styles.contentBody}>
+          {menuSections.map((section, sIdx) => (
+            <View key={sIdx} style={styles.sectionWrapper}>
+              <Text style={styles.sectionTitleText}>{section.title}</Text>
+              <View style={styles.menuGroupCard}>
+                {section.items.map((item, iIdx) => (
                   <TouchableOpacity
                     key={item.id}
+                    activeOpacity={0.6}
                     onPress={() => {
-                      if (item.id === "edit-profile") {
-                        router.push("/profile/edit");
-                      }
-
-                      if (item.id === "favorites") {
-                        router.push("../favorite");
-                      }
+                      if (item.id === "edit-profile") router.push("/profile/edit");
+                      if (item.id === "favorites") router.push("../favorite");
                     }}
-
-                    style={[
-                      styles.menuItem,
-                      index === section.items.length - 1 && styles.menuItemLast,
-                    ]}
+                    style={[styles.menuRowItem, iIdx === section.items.length - 1 && { borderBottomWidth: 0 }]}
                   >
-                    <View style={styles.menuItemLeft}>
-                      <View style={[styles.menuIcon, { backgroundColor: item.color + "18" }]}>
-                        {getIconComponent(item.icon, 20, item.color)}
+                    <View style={styles.menuRowLeft}>
+                      <View style={[styles.iconContainer, { backgroundColor: item.bgColor }]}>
+                        {item.icon}
                       </View>
-                      <Text style={styles.menuItemText}>{item.name}</Text>
+                      <Text style={styles.menuNameText}>{item.name}</Text>
                     </View>
 
-                    <View style={styles.menuItemRight}>
-                      {item.hasSwitch ? (
-                        <Switch
-                          value={notificationsEnabled}
-                          onValueChange={setNotificationsEnabled}
-                          trackColor={{ false: colors.border, true: colors.primary }}
-                          thumbColor="#FFF"
-                        />
-                      ) : (
-                        <ChevronRight size={20} color={colors.textMuted} />
-                      )}
-                    </View>
+                    {item.hasSwitch ? (
+                      <Switch
+                        value={notificationsEnabled}
+                        onValueChange={setNotificationsEnabled}
+                        trackColor={{ false: "#D1D5DB", true: "#FFD08A" }}
+                        thumbColor={notificationsEnabled ? "#F59E0B" : "#F3F4F6"}
+                      />
+                    ) : (
+                      <ChevronRight size={18} color="#9CA3AF" />
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
           ))}
 
-          {/* LOGOUT */}
-          <LinearGradient colors={["#F97373", "#EF4444"]} style={styles.logoutGradient}>
-            <TouchableOpacity
-              style={styles.logoutButtonContent}
-              onPress={async () => {
-                await signOut();
-                router.replace("/(auth)/login");
-              }}
-            >
-              <LogOut size={20} color="#FFF" />
-              <Text style={styles.logoutButtonText}>Đăng xuất</Text>
-            </TouchableOpacity>
-          </LinearGradient>
-        </View>
+          {/* DANGER ZONE */}
+          <TouchableOpacity 
+            style={styles.logoutBtn} 
+            activeOpacity={0.8}
+            onPress={async () => {
+              await signOut();
+              router.replace("/(auth)/login");
+            }}
+          >
+            <LogOut size={20} color="#EF4444" />
+            <Text style={styles.logoutBtnText}>Đăng xuất tài khoản</Text>
+          </TouchableOpacity>
 
-        <View style={styles.appInfo}>
-          <Text style={styles.appInfoText}>BookingApp v1.0.0</Text>
+          <Text style={styles.versionText}>Phiên bản 1.0.2 • PhatDat Store</Text>
         </View>
       </ScrollView>
 
-      {/* BOTTOM SHEET */}
+      {/* MODERN BOTTOM SHEET */}
       {showPicker && (
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={closePickerSheet}>
-          <Animated.View
-            style={[
-              styles.bottomSheetUltra,
-              {
-                transform: [
-                  {
-                    translateY: slideAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [350, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.dragHandle} />
-            <Text style={styles.sheetTitleUltra}>Chọn ảnh đại diện</Text>
-
-            <LinearGradient colors={["#FFD600", "#FF9F00"]} style={styles.ultraButtonGradient}>
-              <TouchableOpacity
-                style={styles.ultraButton}
-                onPress={async () => {
-                  closePickerSheet();
-                  await handleChangeAvatar();
-                }}
-              >
-                <Text style={styles.ultraButtonText}>Chọn ảnh từ thư viện</Text>
-              </TouchableOpacity>
-            </LinearGradient>
-
-            <TouchableOpacity style={styles.ultraCancel} onPress={closePickerSheet}>
-              <Text style={styles.ultraCancelText}>Hủy</Text>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={{flex:1}} onPress={closePickerSheet} />
+          <Animated.View style={[styles.sheetContent, { transform: [{ translateY: slideAnim.interpolate({ inputRange:[0,1], outputRange:[300,0] }) }] }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetHeaderTitle}>Thay đổi ảnh đại diện</Text>
+            <Text style={styles.sheetSubTitle}>Chọn ảnh rõ mặt để hiển thị tốt nhất</Text>
+            
+            <TouchableOpacity style={styles.sheetActionBtn} onPress={handleChangeAvatar}>
+              <LinearGradient colors={["#FFD08A", "#F59E0B"]} style={styles.sheetActionGradient}>
+                <Text style={styles.sheetActionText}>Tải ảnh lên từ thiết bị</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.sheetCancelBtn} onPress={closePickerSheet}>
+              <Text style={styles.sheetCancelText}>Để sau</Text>
             </TouchableOpacity>
           </Animated.View>
-        </TouchableOpacity>
+        </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 /* ================================ STYLES ================================ */
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-
+  container: { flex: 1, backgroundColor: "#F9FAFB" },
   header: {
-    paddingHorizontal: spacing(4),
-    paddingTop: spacing(3),
-    paddingBottom: spacing(8),
-    borderBottomLeftRadius: radius.xl,
-    borderBottomRightRadius: radius.xl,
-  },
-
-  headerTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing(4),
-  },
-
-  headerHello: { fontSize: 22, fontWeight: "800", color: colors.text },
-  headerSubtitle: { fontSize: 13, color: "rgba(0,0,0,0.7)", marginTop: spacing(1) },
-
-  settingsButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-    ...shadow.card,
-  },
-
-  profileSection: { flexDirection: "row", alignItems: "center", marginTop: spacing(1) },
-  avatarContainer: { position: "relative", marginRight: spacing(3) },
-  avatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: "#fff" },
-
-  editAvatarButton: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 34,
-    height: 34,
-    backgroundColor: "#fff",
-    borderRadius: 17,
-    justifyContent: "center",
-    alignItems: "center",
-    ...shadow.card,
-  },
-
-  profileInfo: { flex: 1 },
-  userName: { fontSize: 20, fontWeight: "800", color: colors.text },
-  userEmail: { fontSize: 13, color: colors.textMuted, marginTop: spacing(0.5) },
-  userPhone: { fontSize: 13, color: colors.textMuted, marginTop: spacing(0.5), marginBottom: spacing(1.5) },
-
-  membershipBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(245,158,11,0.12)",
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(245,158,11,0.4)",
-  },
-
-  membershipText: { fontSize: 13, fontWeight: "600", color: colors.warning, marginLeft: spacing(1) },
-
-  menuContainer: { paddingHorizontal: spacing(4) },
-  menuSection: { marginBottom: spacing(4) },
-  menuSectionTitle: { fontSize: 16, fontWeight: "700", color: colors.text, marginBottom: spacing(1.5) },
-  menuCard: { backgroundColor: colors.card, borderRadius: radius.lg, ...shadow.card },
-
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(3),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  menuItemLast: { borderBottomWidth: 0 },
-
-  menuItemLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
-  menuIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: spacing(2),
-  },
-  menuItemText: { fontSize: 15, fontWeight: "600", color: colors.text },
-  menuItemRight: { marginLeft: spacing(2) },
-
-  logoutGradient: { borderRadius: radius.lg, ...shadow.card },
-  logoutButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing(3),
-  },
-  logoutButtonText: { fontSize: 15, fontWeight: "700", color: "#fff", marginLeft: spacing(1.5) },
-
-  appInfo: { alignItems: "center", paddingVertical: spacing(4), paddingBottom: spacing(6) },
-  appInfoText: { fontSize: 13, color: colors.textMuted },
-
-  overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end",
-  },
-
-  bottomSheetUltra: {
-    width: "100%",
-    backgroundColor: "rgba(255,255,255,0.92)",
-    paddingTop: 20,
-    paddingBottom: 35,
     paddingHorizontal: 24,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 25,
-    shadowOffset: { width: 0, height: -5 },
-    elevation: 30,
+    paddingBottom: 35, // Giảm padding bottom để header gọn hơn
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    ...shadow.card,
   },
-
-  dragHandle: {
-    width: 48,
-    height: 5,
-    backgroundColor: "rgba(120,120,120,0.35)",
-    borderRadius: 50,
-    alignSelf: "center",
-    marginBottom: 18,
+  headerActionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5, // Giảm margin đẩy profile lên cao
   },
-
-  sheetTitleUltra: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1a1a1a",
-    textAlign: "center",
-    marginBottom: 22,
-  },
-
-  ultraButtonGradient: {
-    borderRadius: 16,
-    marginBottom: 16,
-    paddingVertical: 2,
-  },
-
-  ultraButton: {
-    width: "100%",
-    paddingVertical: 16,
+  glassButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
-
-  ultraButtonText: {
-    fontSize: 16,
+  profileMainRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatarWrapper: {
+    position: "relative",
+  },
+  avatarBorder: {
+    padding: 4,
+    backgroundColor: "#FFF",
+    borderRadius: 50,
+    ...shadow.card,
+  },
+  avatarImage: {
+    width: 80, // Tinh chỉnh kích thước avatar
+    height: 80,
+    borderRadius: 40,
+  },
+  cameraBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#4B5563",
+    padding: 6,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: "#FFF",
+  },
+  profileTextInfo: {
+    marginLeft: 18,
+    flex: 1,
+  },
+  userNameText: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#1F2937",
+    letterSpacing: -0.5,
+  },
+  userSubText: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginTop: 1,
+    fontWeight: "500",
+  },
+  statusBadge: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+  },
+  badgeGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#FFF",
+    marginLeft: 4,
+    textTransform: "uppercase",
+  },
+  contentBody: {
+    paddingHorizontal: 20,
+    marginTop: -30, // Tăng độ đè lên header
+  },
+  sectionWrapper: {
+    marginBottom: 20,
+  },
+  sectionTitleText: {
+    fontSize: 13,
     fontWeight: "700",
-    color: "#fff",
+    color: "#9CA3AF",
+    marginBottom: 10,
+    marginLeft: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
-
-  ultraCancel: {
-    marginTop: 4,
-    paddingVertical: 15,
+  menuGroupCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 24,
+    paddingVertical: 2,
+    ...shadow.card,
   },
-
-  ultraCancelText: {
-    textAlign: "center",
+  menuRowItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  menuRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  iconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+  menuNameText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#777",
+    color: "#374151",
+  },
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF",
+    paddingVertical: 16,
+    borderRadius: 20,
+    marginTop: 5,
+    borderWidth: 1.5,
+    borderColor: "#FEE2E2",
+  },
+  logoutBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#EF4444",
+    marginLeft: 10,
+  },
+  versionText: {
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 11,
+    color: "#D1D5DB",
+    fontWeight: "500",
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+    zIndex: 1000,
+  },
+  sheetContent: {
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 35,
+    borderTopRightRadius: 35,
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 25,
+    paddingTop: 12,
+  },
+  sheetHandle: {
+    width: 45,
+    height: 5,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 10,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  sheetHeaderTitle: {
+    fontSize: 19,
+    fontWeight: "800",
+    color: "#1F2937",
+    textAlign: "center",
+  },
+  sheetSubTitle: {
+    fontSize: 14,
+    color: "#6B7280",
+    textAlign: "center",
+    marginTop: 6,
+    marginBottom: 25,
+  },
+  sheetActionBtn: {
+    width: "100%",
+  },
+  sheetActionGradient: {
+    paddingVertical: 16,
+    borderRadius: 18,
+    alignItems: "center",
+  },
+  sheetActionText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  sheetCancelBtn: {
+    marginTop: 15,
+    paddingVertical: 10,
+  },
+  sheetCancelText: {
+    textAlign: "center",
+    color: "#9CA3AF",
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

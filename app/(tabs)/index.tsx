@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,11 +7,11 @@ import {
   Image,
   TextInput,
   FlatList,
-  // LOẠI BỎ SafeAreaView ở đây
+  Keyboard,
 } from "react-native";
 
 import { LinearGradient } from "expo-linear-gradient";
-import { Search, MapPin, Star, Clock, Filter, Heart } from "lucide-react-native";
+import { Search, MapPin, Star, Clock, Filter, Heart, History } from "lucide-react-native";
 import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 
@@ -43,8 +43,11 @@ export default function HomeScreen() {
   // 👉 CHỈ LƯU service_id
   const [favoriteServices, setFavoriteServices] = useState<number[]>([]);
 
+  // 👉 QUẢN LÝ HIỂN THỊ DỰ ĐOÁN
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   /* ============================================
-     LOAD SERVICES
+      LOAD SERVICES
   ============================================ */
   useEffect(() => {
     const loadServices = async () => {
@@ -82,7 +85,7 @@ export default function HomeScreen() {
   }, []);
 
   /* ============================================
-     LOAD USER
+      LOAD USER
   ============================================ */
   useEffect(() => {
     const loadUserInfo = async () => {
@@ -102,135 +105,160 @@ export default function HomeScreen() {
     }, [])
   );
 
-
- /* ============================================
+  /* ============================================
    LOAD FAVORITES (LOAD 1 LẦN)
-============================================ */
-const loadFavorites = async () => {
-  try {
+  ============================================ */
+  const loadFavorites = async () => {
+    try {
+      const session = await SecureStore.getItemAsync("my-user-session");
+      const token = session ? JSON.parse(session).token : null;
+
+      const res = await fetch(
+        "https://phatdat.store/api/v1/favorite/get-all",
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const text = await res.text();
+
+      if (!text) {
+        setFavoriteServices([]);
+        return;
+      }
+
+      const json = JSON.parse(text);
+
+      if (json.err === 0) {
+        setFavoriteServices(json.data.map((f: any) => f.service_id));
+      }
+    } catch (err) {
+      console.log("LOAD FAVORITES ERROR:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadFavorites();
+  }, []);
+
+  /* ============================================
+      FAVORITE API
+  ============================================ */
+  const addFavorite = async (service_id: number) => {
     const session = await SecureStore.getItemAsync("my-user-session");
     const token = session ? JSON.parse(session).token : null;
 
     const res = await fetch(
-      "https://phatdat.store/api/v1/favorite/get-all",
-      { headers: { Authorization: `Bearer ${token}` } }
+      "https://phatdat.store/api/v1/favorite/create",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ service_id }),
+      }
     );
+
+    if (res.status === 204) return { err: 0 };
 
     const text = await res.text();
+    if (!text) return { err: 0 };
 
-    if (!text) {
-      setFavoriteServices([]);
-      return;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { err: 0 };
     }
+  };
 
-    const json = JSON.parse(text);
+  const removeFavorite = async (service_id: number) => {
+    try {
+      const session = await SecureStore.getItemAsync("my-user-session");
+      const token = session ? JSON.parse(session).token : null;
 
-    if (json.err === 0) {
-      setFavoriteServices(json.data.map((f: any) => f.service_id));
+      const res = await fetch(
+        `https://phatdat.store/api/v1/favorite/delete/${service_id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (res.status === 204 || res.status === 200) return { err: 0 };
+
+      const text = await res.text();
+      if (!text) return { err: 0 };
+
+      return JSON.parse(text);
+    } catch (error) {
+      console.log("REMOVE ERROR:", error);
+      return { err: 1 };
     }
-  } catch (err) {
-    console.log("LOAD FAVORITES ERROR:", err);
-  }
-};
-
-useEffect(() => {
-  loadFavorites();
-}, []);
-
-
-
-  /* ============================================
-     FAVORITE API
-  ============================================ */
-const addFavorite = async (service_id: number) => {
-  const session = await SecureStore.getItemAsync("my-user-session");
-  const token = session ? JSON.parse(session).token : null;
-
-  const res = await fetch(
-    "https://phatdat.store/api/v1/favorite/create",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ service_id }),
-    }
-  );
-
-  if (res.status === 204) return { err: 0 };
-
-  const text = await res.text();
-  if (!text) return { err: 0 };
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { err: 0 };
-  }
-};
-
-
-  // 🔥 FIX DUY NHẤT – DELETE PHẢI GỬI BODY
- const removeFavorite = async (service_id: number) => {
-  const session = await SecureStore.getItemAsync("my-user-session");
-  const token = session ? JSON.parse(session).token : null;
-
-  const res = await fetch(
-    `https://phatdat.store/api/v1/favorite/delete/${service_id}`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
-
-  if (res.status === 204) return { err: 0 };
-
-  const text = await res.text();
-  if (!text) return { err: 0 };
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { err: 0 };
-  }
-};
-
-  /* ============================================
-     TOGGLE FAVORITE (GIỮ NGUYÊN LOGIC)
-  ============================================ */
- const toggleFavorite = async (id: number) => {
-  const isFav = favoriteServices.includes(id);
-
-  // Optimistic UI
-  setFavoriteServices((prev) =>
-    isFav ? prev.filter((x) => x !== id) : [...prev, id]
-  );
-
-  const res = isFav
-    ? await removeFavorite(id)
-    : await addFavorite(id);
-
-  // Rollback nếu BE fail
-  if (res.err !== 0) {
-    setFavoriteServices((prev) =>
-      isFav ? [...prev, id] : prev.filter((x) => x !== id)
-    );
-  }
-};
-
-  /* ============================================
-     SEARCH
-  ============================================ */
-  const handleSearchSubmit = () => {
-    if (!searchQuery.trim()) return;
-    router.push({ pathname: "/search", params: { q: searchQuery } });
   };
 
   /* ============================================
-     SERVICE CARD
+      TOGGLE FAVORITE
+  ============================================ */
+  const toggleFavorite = async (id: number) => {
+    const isFav = favoriteServices.includes(id);
+
+    setFavoriteServices((prev) =>
+      isFav ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+
+    const res = isFav
+      ? await removeFavorite(id)
+      : await addFavorite(id);
+
+    if (res.err !== 0) {
+      setFavoriteServices((prev) =>
+        isFav ? [...prev, id] : prev.filter((x) => x !== id)
+      );
+    }
+  };
+
+  /* ============================================
+      LOGIC DỰ ĐOÁN (SUGGESTIONS)
+  ============================================ */
+  const suggestions = useMemo(() => {
+    if (!searchQuery.trim() || !showSuggestions) return [];
+    
+    // Chuẩn hóa chuỗi tìm kiếm
+    const query = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+    return services
+      .filter(s => {
+        const name = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return name.includes(query);
+      })
+      .map(s => s.name)
+      .slice(0, 5); // Lấy tối đa 5 gợi ý
+  }, [searchQuery, services, showSuggestions]);
+
+  const handleSelectSuggestion = (name: string) => {
+    setSearchQuery(name);
+    setShowSuggestions(false);
+    Keyboard.dismiss();
+    router.push({ pathname: "/search", params: { q: name } });
+  };
+
+  /* ============================================
+      SEARCH & SEE ALL LOGIC (FIX)
+  ============================================ */
+  const handleSearchSubmit = () => {
+    const query = searchQuery.trim();
+    setShowSuggestions(false);
+    router.push({ pathname: "/search", params: { q: query } });
+  };
+
+  const handleSeeAll = () => {
+    router.push("/search");
+  };
+
+  /* ============================================
+      SERVICE CARD
   ============================================ */
   const renderServiceCard = ({ item }: { item: Service }) => {
     const isFav = favoriteServices.includes(item.id);
@@ -281,7 +309,6 @@ const addFavorite = async (service_id: number) => {
           </View>
         </TouchableOpacity>
 
-        {/* ❤️ FAVORITE */}
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.favoriteIcon}
@@ -299,22 +326,21 @@ const addFavorite = async (service_id: number) => {
 
   if (servicesLoading) {
     return (
-      // Dùng View thường thay vì SafeAreaView
-      <View style={styles.container}> 
+      <View style={styles.container}>
         <HomeSkeleton />
       </View>
     );
   }
 
   return (
-    // FIX: Thay SafeAreaView bằng View thường
-    <View style={styles.container}> 
+    <View style={styles.container}>
       <FlatList
         data={services}
         renderItem={renderServiceCard}
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={() => setShowSuggestions(false)} // Ẩn dự đoán khi cuộn
         columnWrapperStyle={styles.serviceRow}
         contentContainerStyle={{ paddingBottom: 40 }}
         ListHeaderComponent={
@@ -323,6 +349,10 @@ const addFavorite = async (service_id: number) => {
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             handleSearchSubmit={handleSearchSubmit}
+            handleSeeAll={handleSeeAll}
+            setShowSuggestions={setShowSuggestions}
+            suggestions={suggestions}
+            handleSelectSuggestion={handleSelectSuggestion}
           />
         }
       />
@@ -331,11 +361,20 @@ const addFavorite = async (service_id: number) => {
 }
 
 /* ============================
-   HEADER
+    HEADER (WITH SUGGESTIONS)
 ============================ */
-function Header({ user, searchQuery, setSearchQuery, handleSearchSubmit }: any) {
+function Header({ 
+  user, 
+  searchQuery, 
+  setSearchQuery, 
+  handleSearchSubmit, 
+  handleSeeAll,
+  setShowSuggestions,
+  suggestions,
+  handleSelectSuggestion
+}: any) {
   return (
-    <View>
+    <View style={{ zIndex: 10 }}>
       <LinearGradient colors={["#FFE7C2", "#FFD08A"]} style={styles.header}>
         <View style={styles.headerContent}>
           <View>
@@ -366,25 +405,51 @@ function Header({ user, searchQuery, setSearchQuery, handleSearchSubmit }: any) 
 
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
-            <Search size={20} color="#A1A1AA" />
+            <TouchableOpacity onPress={handleSearchSubmit}>
+              <Search size={20} color="#A1A1AA" />
+            </TouchableOpacity>
             <TextInput
               style={styles.searchInput}
               placeholder="Tìm dịch vụ, spa, gym..."
               value={searchQuery}
-              onChangeText={setSearchQuery}
+              onChangeText={(txt) => {
+                setSearchQuery(txt);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
               onSubmitEditing={handleSearchSubmit}
+              returnKeyType="search"
               placeholderTextColor="#9CA3AF"
             />
-            <TouchableOpacity style={styles.filterButton}>
+            <TouchableOpacity 
+              style={styles.filterButton}
+              onPress={handleSeeAll}
+            >
               <Filter size={20} color={colors.primaryAlt} />
             </TouchableOpacity>
           </View>
+
+          {/* 🔥 BẢNG DỰ ĐOÁN TÌM KIẾM */}
+          {suggestions.length > 0 && (
+            <View style={styles.suggestionBox}>
+              {suggestions.map((item: string, index: number) => (
+                <TouchableOpacity 
+                  key={index} 
+                  style={styles.suggestionItem}
+                  onPress={() => handleSelectSuggestion(item)}
+                >
+                  <History size={16} color="#A1A1AA" />
+                  <Text style={styles.suggestionText}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
       </LinearGradient>
 
       <View style={[styles.section, styles.sectionHeader]}>
         <Text style={styles.sectionTitle}>Dịch vụ nổi bật</Text>
-        <TouchableOpacity onPress={() => router.push("/search")}>
+        <TouchableOpacity onPress={handleSeeAll}>
           <Text style={styles.seeAllText}>Xem tất cả</Text>
         </TouchableOpacity>
       </View>
@@ -393,12 +458,11 @@ function Header({ user, searchQuery, setSearchQuery, handleSearchSubmit }: any) 
 }
 
 /* ============================
-   STYLES
+    STYLES (KEPT ORIGINAL + ADDED SUGGESTION STYLES)
 ============================ */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F8F8" },
   header: {
-    // FIX: Tăng paddingTop lên để nội dung Header không bị Status Bar che
     paddingTop: 50, 
     paddingBottom: 30,
     paddingHorizontal: 24,
@@ -423,7 +487,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   avatar: { width: 44, height: 44, borderRadius: 22 },
-  searchContainer: { marginTop: 4 },
+  searchContainer: { marginTop: 4, position: 'relative', zIndex: 100 },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -434,6 +498,33 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 15 },
+  
+  // 👉 STYLE BẢNG GỢI Ý (DỰ ĐOÁN)
+  suggestionBox: {
+    position: 'absolute',
+    top: 55,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderRadius: 15,
+    paddingVertical: 5,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    zIndex: 999
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#F0F0F0'
+  },
+  suggestionText: { marginLeft: 12, fontSize: 14, color: '#374151' },
+
   filterButton: {
     padding: 8,
     borderRadius: 14,
