@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+
+    <!-- Cho phép HTTP / tile OSM -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Domain dùng cho MapLibre + OSM -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">demotiles.maplibre.org</domain>
+        <domain includeSubdomains="true">maplibre.org</domain>
+        <domain includeSubdomains="true">openstreetmap.org</domain>
+        <domain includeSubdomains="true">tile.openstreetmap.org</domain>
+    </domain-config>
+
+</network-security-config>

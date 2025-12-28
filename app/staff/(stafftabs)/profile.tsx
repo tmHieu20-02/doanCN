@@ -149,7 +149,7 @@ export default function StaffProfile() {
           style={styles.editProfileBtn}
           onPress={() => router.push("/staff/profile/edit")} // FIX ROUTER 100%
         >
-          <Text style={styles.editProfileText}>Chỉnh sửa thông tin salon</Text>
+          <Text style={styles.editProfileText}>Chỉnh sửa thông tin cửa hàng</Text>
         </TouchableOpacity>
       </View>
 

@@ -8,22 +8,19 @@ import {
   Alert,
   Switch,
 } from "react-native";
-import { useState, useEffect } from "react";
-import { useRouter, useLocalSearchParams, Stack } from "expo-router";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, Stack, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import api from "@/utils/api";
 import * as SecureStore from "expo-secure-store";
 import { useAuth } from "@/hooks/useAuth";
-import { Lock, ArrowLeft } from "lucide-react-native";
+import { Lock, ArrowLeft, MapPin } from "lucide-react-native";
 
 const DRAFT_KEY = "staff-edit-profile-draft";
+const MAP_RESULT_KEY = "map-picker-result";
 
 export default function EditStaffProfile() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    selectedLat?: string;
-    selectedLng?: string;
-  }>();
   const { updateUser } = useAuth();
 
   const [storeName, setStoreName] = useState("");
@@ -35,11 +32,14 @@ export default function EditStaffProfile() {
   const [storeLng, setStoreLng] = useState("");
 
   /* =========================
-     LOAD PROFILE / DRAFT
+      1. LOAD PROFILE / DRAFT BAN ĐẦU
   ========================= */
   useEffect(() => {
     const load = async () => {
       const draft = await SecureStore.getItemAsync(DRAFT_KEY);
+      const stored = await SecureStore.getItemAsync("my-user-session");
+      const data = stored ? JSON.parse(stored) : {};
+      const profile = data?.staffProfile;
 
       if (draft) {
         const d = JSON.parse(draft);
@@ -48,14 +48,10 @@ export default function EditStaffProfile() {
         setExperience(d.experience || "");
         setBio(d.bio || "");
         setIsActive(d.isActive ?? true);
-        setStoreLat(d.storeLat || "");
-        setStoreLng(d.storeLng || "");
+        setStoreLat(d.storeLat ? String(d.storeLat) : "");
+        setStoreLng(d.storeLng ? String(d.storeLng) : "");
         return;
       }
-
-      const stored = await SecureStore.getItemAsync("my-user-session");
-      const data = stored ? JSON.parse(stored) : {};
-      const profile = data?.staffProfile;
 
       if (profile) {
         setStoreName(profile.store_name || "");
@@ -67,168 +63,114 @@ export default function EditStaffProfile() {
         setStoreLng(profile.store_lng ? String(profile.store_lng) : "");
       }
     };
-
     load();
   }, []);
 
   /* =========================
-     UPDATE FROM MAP PICKER
+      2. LẮNG NGHE KẾT QUẢ TỪ BẢN ĐỒ
   ========================= */
-  useEffect(() => {
-    if (params.selectedLat && params.selectedLng) {
-      const lat = String(params.selectedLat);
-      const lng = String(params.selectedLng);
+  useFocusEffect(
+    useCallback(() => {
+      const checkMapResult = async () => {
+        const result = await SecureStore.getItemAsync(MAP_RESULT_KEY);
+        if (result) {
+          const { lat, lng } = JSON.parse(result);
+          
+          // Nhận giá trị string chính xác từ Map (đã toFixed(7))
+          setStoreLat(lat);
+          setStoreLng(lng);
 
-      setStoreLat(lat);
-      setStoreLng(lng);
+          // Cập nhật ngay vào bản nháp
+          const draft = await SecureStore.getItemAsync(DRAFT_KEY);
+          const currentDraft = draft ? JSON.parse(draft) : {};
+          await SecureStore.setItemAsync(DRAFT_KEY, JSON.stringify({
+            ...currentDraft,
+            storeLat: lat,
+            storeLng: lng
+          }));
 
-      SecureStore.setItemAsync(
-        DRAFT_KEY,
-        JSON.stringify({
-          storeName,
-          storeAddress,
-          experience,
-          bio,
-          isActive,
-          storeLat: lat,
-          storeLng: lng,
-        })
-      );
-    }
-  }, [params.selectedLat, params.selectedLng]);
+          await SecureStore.deleteItemAsync(MAP_RESULT_KEY);
+        }
+      };
+      checkMapResult();
+    }, [])
+  );
 
-  /* =========================
-     SAVE DRAFT
-  ========================= */
   const saveDraft = async () => {
-    await SecureStore.setItemAsync(
-      DRAFT_KEY,
-      JSON.stringify({
-        storeName,
-        storeAddress,
-        experience,
-        bio,
-        isActive,
-        storeLat,
-        storeLng,
-      })
-    );
+    await SecureStore.setItemAsync(DRAFT_KEY, JSON.stringify({
+      storeName, storeAddress, experience, bio, isActive, storeLat, storeLng
+    }));
   };
 
-  /* =========================
-     SAVE PROFILE
-  ========================= */
   const handleSave = async () => {
-    if (!storeName.trim()) {
-      return Alert.alert(
-        "Thiếu thông tin",
-        "Tên địa điểm làm việc không được để trống."
-      );
-    }
+    if (!storeName.trim()) return Alert.alert("Lỗi", "Tên cửa hàng không được rỗng.");
 
     try {
       const stored = await SecureStore.getItemAsync("my-user-session");
-      const token = JSON.parse(stored || "{}")?.token;
+      const session = JSON.parse(stored || "{}");
+      const token = session?.token;
 
-      const res = await api.put(
-        "/staff/profile",
-        {
-          store_name: storeName,
-          store_address: storeAddress,
-          experience_years: Number(experience) || 0,
-          bio,
-          is_active: isActive,
-          store_lat: storeLat ? Number(storeLat) : null,
-          store_lng: storeLng ? Number(storeLng) : null,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await api.put("/staff/profile", {
+        store_name: storeName,
+        store_address: storeAddress,
+        experience_years: Number(experience) || 0,
+        bio,
+        is_active: isActive,
+        store_lat: storeLat ? parseFloat(storeLat) : null,
+        store_lng: storeLng ? parseFloat(storeLng) : null,
+      }, { headers: { Authorization: `Bearer ${token}` } });
 
       if (res.data?.err === 0) {
         await SecureStore.deleteItemAsync(DRAFT_KEY);
-
-        const saved = stored ? JSON.parse(stored) : {};
-        saved.staffProfile = res.data.profile;
-        await SecureStore.setItemAsync(
-          "my-user-session",
-          JSON.stringify(saved)
-        );
-
+        session.staffProfile = res.data.profile;
+        await SecureStore.setItemAsync("my-user-session", JSON.stringify(session));
         await updateUser({ staffProfile: res.data.profile });
-        Alert.alert("Thành công", "Đã cập nhật thông tin làm việc.");
+        Alert.alert("Thành công", "Đã cập nhật hồ sơ.");
         router.back();
-      } else {
-        Alert.alert("Lỗi", res.data?.mes || "Không thể cập nhật.");
       }
     } catch {
-      Alert.alert("Lỗi", "Không thể kết nối server.");
+      Alert.alert("Lỗi", "Không thể kết nối máy chủ.");
     }
   };
 
-  /* =========================
-     UI
-  ========================= */
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-
       <SafeAreaView style={{ flex: 1, backgroundColor: "#F9FAFB" }}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <ArrowLeft size={22} color="#111827" />
-          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.back()}><ArrowLeft size={22} color="#111827" /></TouchableOpacity>
           <Text style={styles.headerTitle}>Thông tin làm việc</Text>
           <View style={{ width: 22 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.container}>
           <Label text="Tên cửa hàng" />
-          <Input value={storeName} onChangeText={setStoreName} />
+          <Input value={storeName} onChangeText={setStoreName} placeholder="Nhập tên..." />
 
-          <Label text="Địa chỉ" />
-          <Input value={storeAddress} onChangeText={setStoreAddress} />
+          <Label text="Địa chỉ chi tiết" />
+          <Input value={storeAddress} onChangeText={setStoreAddress} placeholder="Số nhà, đường..." />
 
-          <Label text="Kinh nghiệm (năm)" />
-          <Input
-            value={experience}
-            onChangeText={setExperience}
-            keyboardType="numeric"
-          />
-
-          <Label text="Giới thiệu" />
-          <Input
-            value={bio}
-            onChangeText={setBio}
-            multiline
-            style={{ height: 100 }}
-          />
-
-          <Label text="Vị trí làm việc" />
+          <Label text="Vị trí tọa độ (Lat / Lng)" />
           <View style={styles.row}>
-            <LockedInput value={storeLat} />
-            <LockedInput value={storeLng} />
+            {/* LockedInput hiển thị số chuẩn xác từ trái sang phải */}
+            <LockedInput value={storeLat} placeholder="Latitude" />
+            <LockedInput value={storeLng} placeholder="Longitude" />
           </View>
 
-          <TouchableOpacity
-            style={styles.mapBtn}
-            onPress={async () => {
-              await saveDraft();
-              router.push({
-                pathname: "/staff/modal/map-picker" as any,
-                params: {
-                  lat: storeLat || "10.762622",
-                  lng: storeLng || "106.660172",
-                },
-              });
-
-            }}
-          >
-            <Text style={styles.mapText}>Chọn trên bản đồ</Text>
+          <TouchableOpacity style={styles.mapBtn} onPress={async () => { await saveDraft(); router.push("/staff/modal/map-picker"); }}>
+            <MapPin size={18} color="#2563EB" style={{ marginRight: 8 }} />
+            <Text style={styles.mapText}>Chọn lại trên bản đồ</Text>
           </TouchableOpacity>
 
+          <Label text="Kinh nghiệm (năm)" />
+          <Input value={experience} onChangeText={setExperience} keyboardType="numeric" />
+
+          <Label text="Giới thiệu bản thân" />
+          <Input value={bio} onChangeText={setBio} multiline style={{ height: 80 }} />
+
           <View style={styles.switchRow}>
-            <Text>Đang nhận khách</Text>
-            <Switch value={isActive} onValueChange={setIsActive} />
+            <Text style={{ fontWeight: "500" }}>Trạng thái hoạt động</Text>
+            <Switch value={isActive} onValueChange={setIsActive} trackColor={{ true: "#2563EB" }} />
           </View>
 
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
@@ -240,100 +182,39 @@ export default function EditStaffProfile() {
   );
 }
 
-/* =========================
-   UI COMPONENTS
-========================= */
 const Label = ({ text }: { text: string }) => (
-  <Text style={{ marginTop: 14, marginBottom: 6 }}>{text}</Text>
+  <Text style={styles.label}>{text}</Text>
 );
 
 const Input = (props: any) => (
-  <TextInput {...props} style={[styles.input, props.style]} />
+  <TextInput {...props} style={[styles.input, props.style]} placeholderTextColor="#9CA3AF" />
 );
 
-const LockedInput = ({ value }: { value: string }) => (
+const LockedInput = ({ value, placeholder }: { value: string; placeholder?: string }) => (
   <View style={styles.lockWrap}>
-    <TextInput value={value} editable={false} style={{ flex: 1 }} />
-    <Lock size={14} />
+    <TextInput 
+      value={value} 
+      editable={false} 
+      placeholder={placeholder} 
+      style={styles.lockedText} 
+      textAlignVertical="center"
+    />
+    <Lock size={14} color="#9CA3AF" />
   </View>
 );
 
-/* =========================
-   STYLES
-========================= */
 const styles = StyleSheet.create({
-  header: {
-    height: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    backgroundColor: "#FFF",
-    borderBottomWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  container: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    backgroundColor: "#FFF",
-  },
-  row: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  lockWrap: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    backgroundColor: "#F3F4F6",
-    gap: 6,
-  },
-  mapBtn: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "#2563EB",
-    borderRadius: 10,
-    paddingVertical: 10,
-  },
-  mapText: {
-    color: "#2563EB",
-    textAlign: "center",
-    fontWeight: "600",
-  },
-  switchRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 20,
-  },
-  saveBtn: {
-    marginTop: 24,
-    paddingVertical: 14,
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-  },
-  saveText: {
-    color: "#FFF",
-    textAlign: "center",
-    fontSize: 15,
-    fontWeight: "600",
-  },
+  header: { height: 56, flexDirection: "row", alignItems: "center", paddingHorizontal: 16, backgroundColor: "#FFF", borderBottomWidth: 1, borderColor: "#E5E7EB" },
+  headerTitle: { flex: 1, textAlign: "center", fontSize: 16, fontWeight: "700", color: "#111827" },
+  container: { padding: 20, paddingBottom: 40 },
+  label: { marginTop: 16, marginBottom: 8, fontSize: 14, fontWeight: "600", color: "#374151" },
+  input: { borderWidth: 1, borderColor: "#D1D5DB", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, backgroundColor: "#FFF" },
+  row: { flexDirection: "row", gap: 10 },
+  lockWrap: { flex: 1, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 12, backgroundColor: "#F3F4F6", height: 50 },
+  lockedText: { flex: 1, color: "#111827", fontSize: 13, padding: 0, margin: 0 },
+  mapBtn: { marginTop: 12, flexDirection: "row", justifyContent: "center", alignItems: "center", borderWidth: 1.5, borderColor: "#2563EB", borderRadius: 12, paddingVertical: 12, borderStyle: "dashed" },
+  mapText: { color: "#2563EB", fontWeight: "700" },
+  switchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 24, padding: 12, backgroundColor: "#FFF", borderRadius: 12, borderWidth: 1, borderColor: "#E5E7EB" },
+  saveBtn: { marginTop: 32, paddingVertical: 16, backgroundColor: "#2563EB", borderRadius: 14, elevation: 3 },
+  saveText: { color: "#FFF", textAlign: "center", fontSize: 16, fontWeight: "700" },
 });
